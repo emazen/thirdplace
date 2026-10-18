@@ -10,13 +10,16 @@ createdb "$DB"
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f tests/local_supabase_stub.sql
 # The storage migration needs Supabase's storage schema, so it only runs on a real project.
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f migrations/20261018120000_core.sql
+psql -q -v ON_ERROR_STOP=1 -d "$DB" -f migrations/20261018130000_chat.sql
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f tests/backend_test.sql
+psql -q -v ON_ERROR_STOP=1 -d "$DB" -f tests/chat_test.sql
 dropdb "$DB"
 
 # Second pass: the demo seed, as a newcomer would see it.
 createdb "$DB"
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f tests/local_supabase_stub.sql
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f migrations/20261018120000_core.sql
+psql -q -v ON_ERROR_STOP=1 -d "$DB" -f migrations/20261018130000_chat.sql
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f seed.sql
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f tests/seed_test.sql
 dropdb "$DB"

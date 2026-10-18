@@ -4,10 +4,26 @@ import Foundation
 public struct BackendConfig: Decodable, Sendable {
     public let url: URL
     public let anonKey: String
+    /// True once custom SMTP sends 6-digit codes; otherwise emails carry a sign-in link.
+    public let emailCodes: Bool
+    /// True once Sign in with Apple is configured (needs an Apple Developer account).
+    public let appleSignIn: Bool
 
-    public init(url: URL, anonKey: String) {
+    public init(url: URL, anonKey: String, emailCodes: Bool = false, appleSignIn: Bool = false) {
         self.url = url
         self.anonKey = anonKey
+        self.emailCodes = emailCodes
+        self.appleSignIn = appleSignIn
+    }
+
+    enum CodingKeys: String, CodingKey { case url, anonKey, emailCodes, appleSignIn }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        url = try c.decode(URL.self, forKey: .url)
+        anonKey = try c.decode(String.self, forKey: .anonKey)
+        emailCodes = try c.decodeIfPresent(Bool.self, forKey: .emailCodes) ?? false
+        appleSignIn = try c.decodeIfPresent(Bool.self, forKey: .appleSignIn) ?? false
     }
 }
 
@@ -188,16 +204,23 @@ public struct MatchRow: Decodable, Sendable, Identifiable, Hashable {
     public let photoPaths: [String]
     public let matchedAt: String
     public let sharedPlaces: [SharedPlace]
+    public let lastMessage: String?
+    public let lastMessageAt: String?
+    public let lastMessageMine: Bool?
+    public let unread: Int
 
     public var id: UUID { personID }
 
     enum CodingKeys: String, CodingKey {
-        case age
+        case age, unread
         case personID = "person_id"
         case firstName = "first_name"
         case photoPaths = "photo_paths"
         case matchedAt = "matched_at"
         case sharedPlaces = "shared_places"
+        case lastMessage = "last_message"
+        case lastMessageAt = "last_message_at"
+        case lastMessageMine = "last_message_mine"
     }
 
     public struct SharedPlace: Decodable, Sendable, Hashable {
@@ -223,5 +246,56 @@ public struct OverlapPreview: Decodable, Sendable {
     public init(places: [String: Int], total: Int) {
         self.places = places
         self.total = total
+    }
+}
+
+public struct ChatMessage: Decodable, Sendable, Identifiable, Hashable {
+    public let id: Int
+    public let userA: UUID
+    public let userB: UUID
+    public let sender: UUID
+    public let body: String
+    /// ISO 8601 timestamp from the server.
+    public let createdAt: String
+    public let readAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, sender, body
+        case userA = "user_a"
+        case userB = "user_b"
+        case createdAt = "created_at"
+        case readAt = "read_at"
+    }
+
+    public var date: Date? { ServerDate.parse(createdAt) }
+}
+
+public enum ReportReason: String, CaseIterable, Sendable {
+    case fake, inappropriate, harassment, underage, other
+
+    public var label: String {
+        switch self {
+        case .fake: return "Fake profile or stolen photos"
+        case .inappropriate: return "Inappropriate photos or messages"
+        case .harassment: return "Harassment or threats"
+        case .underage: return "Looks under 18"
+        case .other: return "Something else"
+        }
+    }
+}
+
+/// Postgres timestamps arrive with or without fractional seconds.
+public enum ServerDate {
+    public static func parse(_ text: String?) -> Date? {
+        guard let text else { return nil }
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFraction.date(from: text) { return date }
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        if let date = plain.date(from: text) { return date }
+        // Postgres sometimes uses a space instead of "T" and a short offset.
+        let normalized = text.replacingOccurrences(of: " ", with: "T").replacingOccurrences(of: "+00", with: "+00:00")
+        return withFraction.date(from: normalized) ?? plain.date(from: normalized)
     }
 }

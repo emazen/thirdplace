@@ -25,6 +25,9 @@ final class AppModel {
     var scanPoints: [PhotoPoint] = []
     var preview: OverlapPreview?
     var remotePeople: [FeedPerson]?
+    var matches: [MatchRow] = []
+    /// Set when an email sign-in link was opened, so the email sheet can close itself.
+    var authLinkCompleted = false
     var working = false
     var errorMessage: String?
 
@@ -86,6 +89,7 @@ final class AppModel {
         scanPoints = []
         preview = nil
         remotePeople = nil
+        matches = []
         history = []
         direction = .leading
         withAnimation(.smooth(duration: 0.35)) { step = .welcome }

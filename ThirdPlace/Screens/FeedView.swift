@@ -10,6 +10,8 @@ struct FeedView: View {
     @State private var confirmReset = false
     @State private var advanceTask: Task<Void, Never>?
     @State private var loading = false
+    @State private var showMatches = false
+    @State private var showYou = false
 
     var body: some View {
         let people = model.people
@@ -49,6 +51,13 @@ struct FeedView: View {
             loading = true
             await model.loadFeed()
             loading = false
+            await model.loadMatches()
+        }
+        .fullScreenCover(isPresented: $showMatches) {
+            MatchesView()
+        }
+        .sheet(isPresented: $showYou) {
+            YouView()
         }
         .confirmationDialog("Start over?", isPresented: $confirmReset, titleVisibility: .visible) {
             if model.backend != nil {
@@ -66,34 +75,62 @@ struct FeedView: View {
     }
 
     private func header(count: Int) -> some View {
-        HStack(alignment: .center) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .center, spacing: 4) {
                 Text("Crossed paths")
-                    .font(TPFont.display(22))
-                    .tracking(-0.7)
+                    .font(TPFont.display(24))
+                    .tracking(-0.8)
                     .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
                     .onLongPressGesture { confirmReset = true }
-                if count > 0 {
-                    MonoLabel(text: model.backend == nil ? "\(index % count + 1) of \(count)" : "\(count) waiting")
+                Spacer(minLength: 8)
+                if model.backend != nil {
+                    headerButton(icon: "bubble.left", label: model.unreadTotal > 0 ? "Matches, \(model.unreadTotal) unread" : "Matches",
+                                 dot: model.unreadTotal > 0 ? Theme.accent : (model.matches.isEmpty ? nil : Theme.ink)) {
+                        showMatches = true
+                    }
+                    headerButton(icon: "person", label: "You", dot: model.isAnonymousAccount ? Theme.accent : nil) {
+                        showYou = true
+                    }
                 }
             }
-            Spacer()
             HStack(spacing: 6) {
+                if count > 0 {
+                    MonoLabel(text: model.backend == nil ? "\(index % count + 1) of \(count)" : "\(count) waiting")
+                    MonoLabel(text: "·")
+                }
                 Image(systemName: "heart.fill")
-                    .font(.system(size: 12))
+                    .font(.system(size: 9))
                     .foregroundStyle(Theme.accent)
-                Text(model.likesLeft == 1 ? "1 like left" : "\(model.likesLeft) likes left")
-                    .font(TPFont.body(13, weight: .medium))
-                    .foregroundStyle(Theme.ink)
+                MonoLabel(text: model.likesLeft == 1 ? "1 like left today" : "\(model.likesLeft) likes left today", color: Theme.ink)
             }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .background(Capsule().fill(Theme.surface))
-            .overlay(Capsule().strokeBorder(Theme.rule))
         }
         .padding(.horizontal, Theme.gutter)
-        .padding(.top, 8)
-        .frame(height: 60)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+
+    private func headerButton(icon: String, label: String, dot: Color?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(Theme.surface))
+                .overlay(Circle().strokeBorder(Theme.rule))
+                .overlay(alignment: .topTrailing) {
+                    if let dot {
+                        Circle()
+                            .fill(dot)
+                            .frame(width: 9, height: 9)
+                            .overlay(Circle().strokeBorder(Theme.paper, lineWidth: 1.5))
+                            .offset(x: 1, y: -1)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(label)
     }
 
     private func controls(for person: FeedPerson) -> some View {
@@ -149,7 +186,8 @@ struct FeedView: View {
                     toast = "Like sent. If \(person.name) likes you back, you’ll both see where you crossed."
                 case .matched(let venue):
                     pause = 3.2
-                    toast = venue.map { "It’s a match. You both go to \($0)." } ?? "It’s a match with \(person.name)."
+                    toast = venue.map { "It’s a match. You both go to \($0). Say hi in Matches." } ?? "It’s a match with \(person.name)."
+                    Task { await model.loadMatches() }
                 case .outOfLikes:
                     liked = nil
                     toast = "Out of likes until tomorrow. Third Place+ gives you unlimited likes."

@@ -134,3 +134,37 @@ drop trigger if exists demo_like_back on public.likes;
 create trigger demo_like_back
 after insert on public.likes
 for each row execute function tp_private.demo_like_back();
+
+-- Demo people reply to chat messages, so conversations can be tested end to end.
+create or replace function tp_private.demo_reply()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  other uuid := case when new.sender = new.user_a then new.user_b else new.user_a end;
+  replies text[] := array[
+    'Ha, small world. Do you usually sit by the window?',
+    'I think I''ve seen you there! Were you the one with the green notebook?',
+    'Okay this is a bit wild. Coffee there on Thursday?',
+    'Same time next week then?'
+  ];
+  n int;
+begin
+  if not exists (select 1 from public.profiles where id = other and is_demo) then
+    return new;
+  end if;
+  select count(*) into n from public.messages where user_a = new.user_a and user_b = new.user_b and sender = other;
+  if n < array_length(replies, 1) then
+    insert into public.messages (user_a, user_b, sender, body)
+    values (new.user_a, new.user_b, other, replies[n + 1]);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists demo_reply on public.messages;
+create trigger demo_reply
+after insert on public.messages
+for each row execute function tp_private.demo_reply();

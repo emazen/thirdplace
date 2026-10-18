@@ -23,7 +23,7 @@ extension AppModel {
             preview = try await backend.preview(input)
         } catch {
             preview = OverlapPreview(places: [:], total: 0)
-            errorMessage = "Couldn’t reach Third Place. \(error.localizedDescription)"
+            errorMessage = "Couldn’t reach Third Place. \(FriendlyError.message(error))"
         }
     }
 
@@ -42,7 +42,7 @@ extension AppModel {
             try await backend.signIn()
             go(.basics)
         } catch {
-            errorMessage = "Couldn’t sign in. \(error.localizedDescription)"
+            errorMessage = "Couldn’t sign in. \(FriendlyError.message(error))"
         }
     }
 
@@ -73,7 +73,7 @@ extension AppModel {
             try await syncPlaces()
             finishOnboarding()
         } catch {
-            errorMessage = "Couldn’t save your profile. \(error.localizedDescription)"
+            errorMessage = "Couldn’t save your profile. \(FriendlyError.message(error))"
         }
     }
 
@@ -117,7 +117,7 @@ extension AppModel {
             likesLeft = try await backend.likesLeft()
         } catch {
             if remotePeople == nil { remotePeople = [] }
-            errorMessage = "Couldn’t load your feed. \(error.localizedDescription)"
+            errorMessage = "Couldn’t load your feed. \(FriendlyError.message(error))"
         }
     }
 
@@ -137,7 +137,7 @@ extension AppModel {
             }
             return .sent
         } catch {
-            return .failed(error.localizedDescription)
+            return .failed(FriendlyError.message(error))
         }
     }
 
