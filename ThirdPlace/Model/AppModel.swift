@@ -38,7 +38,9 @@ final class AppModel {
         hidden = saved.hidden
         profile = saved.profile
         profilePhotos = store.loadPhotos()
-        if saved.onboarded { step = .feed }
+        // Online, the feed needs an account; local data from demo mode alone isn't enough.
+        let hasAccount = backend == nil || backend?.currentUserID != nil
+        if saved.onboarded && hasAccount { step = .feed }
     }
 
     var people: [FeedPerson] {

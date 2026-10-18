@@ -8,3 +8,6 @@ xcuserdata/
 
 # Supabase project settings for the app (URL + anon key). See supabase/Supabase.example.json.
 ThirdPlace/Supabase.json
+
+# Supabase CLI link state
+supabase/.temp/
