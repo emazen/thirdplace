@@ -9,7 +9,14 @@ enum PlaceNamer {
         var category: String
         var area: String
         var locality: String?
+        var street: String?
     }
+
+    /// Busy streets have a restaurant every 20 m, so a venue only names a place when the photos
+    /// sit right on it. Big places (parks, beaches, stadiums) get more room.
+    private static let venueRadius: CLLocationDistance = 50
+    private static let largeVenueRadius: CLLocationDistance = 150
+    private static let largeCategories: Set<String> = ["Park", "NationalPark", "Beach", "Stadium", "Marina", "Campground", "University", "Zoo", "AmusementPark", "Fairground"]
 
     static func describe(_ coordinate: Coordinate, findVenue: Bool) async -> Name {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
@@ -17,28 +24,49 @@ enum PlaceNamer {
 
         var venue: MKMapItem?
         if findVenue {
-            let request = MKLocalPointsOfInterestRequest(center: location.coordinate, radius: 200)
+            let request = MKLocalPointsOfInterestRequest(center: location.coordinate, radius: largeVenueRadius)
             request.pointOfInterestFilter = MKPointOfInterestFilter(including: thirdPlaceCategories)
             if let response = try? await MKLocalSearch(request: request).start() {
                 venue = response.mapItems
                     .filter { item in
-                        guard let category = item.pointOfInterestCategory else { return false }
-                        return allowed.contains(category) && distance(item, location) <= 200
+                        guard let category = item.pointOfInterestCategory, allowed.contains(category) else { return false }
+                        let key = category.rawValue.replacingOccurrences(of: "MKPOICategory", with: "")
+                        let limit = largeCategories.contains(key) ? largeVenueRadius : venueRadius
+                        return distance(item, location) <= limit
                     }
                     .min { distance($0, location) < distance($1, location) }
             }
         }
 
         let area = placemark?.subLocality ?? placemark?.locality ?? placemark?.administrativeArea ?? "Nearby"
-        let name = venue?.name
-            ?? placemark?.thoroughfare.map { "Near \($0)" }
-            ?? area
+        let street = placemark?.thoroughfare
+        let name = venue?.name ?? "Around \(street ?? area)"
         return Name(
             name: name,
-            category: category(for: venue?.pointOfInterestCategory),
+            category: venue == nil ? "Area" : category(for: venue?.pointOfInterestCategory),
             area: area,
-            locality: placemark?.locality ?? placemark?.administrativeArea ?? placemark?.country
+            locality: placemark?.locality ?? placemark?.administrativeArea ?? placemark?.country,
+            street: street
         )
+    }
+
+    /// Everything someone might hang out at within a short walk, nearest first, for the "fix it" sheet.
+    static func nearbyVenues(_ coordinate: Coordinate) async -> [MKMapItem] {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let request = MKLocalPointsOfInterestRequest(center: location.coordinate, radius: 300)
+        request.pointOfInterestFilter = MKPointOfInterestFilter(including: thirdPlaceCategories + pickerExtras)
+        guard let items = try? await MKLocalSearch(request: request).start().mapItems else { return [] }
+        // Maps doesn't always honour the filter, so check categories here too.
+        let wanted = allowed.union(pickerExtras)
+        return Array(items
+            .filter { $0.pointOfInterestCategory.map(wanted.contains) ?? false }
+            .sorted { distance($0, location) < distance($1, location) }
+            .prefix(12))
+    }
+
+    static func distanceLabel(_ item: MKMapItem, from coordinate: Coordinate) -> String {
+        let meters = distance(item, CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+        return meters < 1000 ? "\(Int(meters.rounded())) m" : String(format: "%.1f km", meters / 1000)
     }
 
     static func search(_ query: String) async -> [MKMapItem] {
@@ -63,6 +91,10 @@ enum PlaceNamer {
         "MovieTheater", "Stadium", "Zoo", "Aquarium", "Planetarium", "University"
     ].map { MKPointOfInterestCategory(rawValue: "MKPOICategory\($0)") }
 
+    /// Also offered when someone fixes a place by hand: bookshops and schools are real hangouts for some.
+    private static let pickerExtras: [MKPointOfInterestCategory] = ["Bookstore", "School"]
+        .map { MKPointOfInterestCategory(rawValue: "MKPOICategory\($0)") }
+
     // The filter alone isn't reliable on every iOS version, so results are checked again.
     private static let allowed = Set(thirdPlaceCategories)
 
@@ -83,6 +115,6 @@ enum PlaceNamer {
         "Stadium": "Stadium", "ConventionCenter": "Venue", "Fairground": "Fairground",
         "AmusementPark": "Theme park", "Zoo": "Zoo", "Aquarium": "Aquarium", "Planetarium": "Planetarium",
         "Landmark": "Landmark", "Castle": "Landmark", "NationalMonument": "Landmark",
-        "Store": "Shop", "University": "Campus", "School": "School"
+        "Store": "Shop", "University": "Campus", "School": "School", "Bookstore": "Bookshop"
     ]
 }

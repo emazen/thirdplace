@@ -166,6 +166,7 @@ private struct ScanCounters: View {
 
 struct PlacesView: View {
     @Environment(AppModel.self) private var model
+    @State private var fixing: MyPlace?
 
     var body: some View {
         let manual = model.access == .denied || (model.scan.finished && model.places.isEmpty && model.access != .unknown)
@@ -195,9 +196,11 @@ struct PlacesView: View {
             if !model.places.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(model.places.enumerated()), id: \.element.id) { index, place in
-                        PlaceRow(place: place, isLast: index == model.places.count - 1) {
+                        PlaceRow(place: place, isLast: index == model.places.count - 1, toggle: {
                             withAnimation(.easeOut(duration: 0.15)) { model.togglePlace(place.id) }
-                        }
+                        }, fix: {
+                            fixing = place
+                        })
                     }
                 }
                 .background(RoundedRectangle(cornerRadius: Theme.radius).fill(Theme.surface))
@@ -237,6 +240,10 @@ struct PlacesView: View {
                 model.go(hasMoments ? .moments : .reveal)
             }
             .buttonStyle(.primary)
+            .sheet(item: $fixing) { place in
+                PlaceFixSheet(place: place)
+                    .presentationDetents([.large])
+            }
         }
     }
 }
@@ -245,38 +252,159 @@ private struct PlaceRow: View {
     let place: MyPlace
     let isLast: Bool
     let toggle: () -> Void
+    let fix: () -> Void
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(place.name)
-                        .font(TPFont.body(16, weight: .semibold))
-                        .tracking(-0.2)
-                        .foregroundStyle(place.selected ? Theme.ink : Theme.ink2)
-                        .lineLimit(2)
-                    Text(place.meta)
-                        .font(TPFont.body(14))
-                        .foregroundStyle(Theme.ink2)
-                    MonoLabel(text: place.detail, size: 10.5)
-                        .padding(.top, 2)
+        HStack(spacing: 10) {
+            Button(action: toggle) {
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(place.name)
+                            .font(TPFont.body(16, weight: .semibold))
+                            .tracking(-0.2)
+                            .foregroundStyle(place.selected ? Theme.ink : Theme.ink2)
+                            .lineLimit(2)
+                        Text(place.meta)
+                            .font(TPFont.body(14))
+                            .foregroundStyle(Theme.ink2)
+                        MonoLabel(text: place.detail, size: 10.5)
+                            .padding(.top, 2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if !place.monthly.isEmpty {
+                        VisitBars(values: place.monthly, isOn: place.selected)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if !place.monthly.isEmpty {
-                    VisitBars(values: place.monthly, isOn: place.selected)
-                }
-                CheckCircle(isOn: place.selected)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 15)
-            .padding(.leading, 18)
-            .padding(.trailing, 16)
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(place.selected ? .isSelected : [])
+
+            Button(action: fix) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.ink2)
+                    .frame(width: 36, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Fix the name of \(place.name)")
+
+            Button(action: toggle) {
+                CheckCircle(isOn: place.selected)
+                    .frame(width: 32, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(place.selected ? "Keep \(place.name)" : "Don’t keep \(place.name)")
+        }
+        .padding(.vertical, 11)
+        .padding(.leading, 18)
+        .padding(.trailing, 10)
+        .overlay(alignment: .bottom) {
+            if !isLast { Hairline(color: Theme.ruleSoft) }
+        }
+    }
+}
+
+/// "That's not where I go": pick the right venue nearby, call it just the area, or name it.
+private struct PlaceFixSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let place: MyPlace
+    @State private var venues: [MKMapItem] = []
+    @State private var loading = true
+    @State private var custom = ""
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Headline(text: "What’s this place?", size: 28)
+                    Subhead(text: "Pick where you actually go. Until you match with someone, they only see “\(place.category == "Area" ? "an area" : place.category.lowercased()) in \(place.area)”.", size: 15)
+                        .padding(.top, 10)
+
+                    MonoLabel(text: "Where you go").padding(.top, 24)
+                    VStack(spacing: 0) {
+                        choice(title: "Just the area",
+                               detail: "Around \(place.street ?? place.area) · not one venue",
+                               current: place.category == "Area", last: venues.isEmpty && !loading) {
+                            model.renamePlace(place.id, name: "Around \(place.street ?? place.area)", category: "Area")
+                            dismiss()
+                        }
+                        if loading {
+                            ProgressView().frame(maxWidth: .infinity, minHeight: 80)
+                        }
+                        ForEach(venues, id: \.self) { item in
+                            choice(title: item.name ?? "Place",
+                                   detail: "\(PlaceNamer.category(for: item.pointOfInterestCategory)) · \(PlaceNamer.distanceLabel(item, from: place.coordinate))",
+                                   current: item.name == place.name, last: item == venues.last) {
+                                model.renamePlace(place.id, name: item.name ?? "Place",
+                                                  category: PlaceNamer.category(for: item.pointOfInterestCategory))
+                                dismiss()
+                            }
+                        }
+                    }
+                    .background(RoundedRectangle(cornerRadius: Theme.radius).fill(Theme.surface))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
+                    .padding(.top, 10)
+
+                    MonoLabel(text: "Or name it yourself").padding(.top, 24)
+                    HStack(spacing: 10) {
+                        TextField("My running route, Grandma’s, …", text: $custom)
+                            .font(TPFont.body(16))
+                            .padding(.horizontal, 16)
+                            .frame(height: 52)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
+                            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.rule))
+                        Button("Save") {
+                            model.renamePlace(place.id, name: custom.trimmingCharacters(in: .whitespaces), category: "Place")
+                            dismiss()
+                        }
+                        .font(TPFont.body(16, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                        .disabled(custom.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(.top, 10)
+                }
+                .padding(.horizontal, Theme.gutter)
+                .padding(.bottom, 32)
+            }
+            .background(Theme.paper.ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .font(TPFont.body(16))
+                        .foregroundStyle(Theme.ink)
+                }
+            }
+        }
+        .task {
+            venues = await PlaceNamer.nearbyVenues(place.coordinate)
+            loading = false
+        }
+    }
+
+    private func choice(title: String, detail: String, current: Bool, last: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(TPFont.body(15, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
+                    Text(detail).font(TPFont.body(13)).foregroundStyle(Theme.ink2).lineLimit(1)
+                }
+                Spacer()
+                if current {
+                    Image(systemName: "checkmark").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.ink)
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 56)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .overlay(alignment: .bottom) {
-            if !isLast { Hairline(color: Theme.ruleSoft) }
+            if !last { Hairline(color: Theme.ruleSoft) }
         }
-        .accessibilityAddTraits(place.selected ? .isSelected : [])
     }
 }
 

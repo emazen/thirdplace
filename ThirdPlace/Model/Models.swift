@@ -34,17 +34,22 @@ struct MyPlace: Identifiable, Codable, Hashable {
     var selected: Bool
     /// Every ~150 m cell in the cluster. Nil for places saved before cells were stored.
     var cells: [String]?
+    /// The street the photos cluster on, for "Around <street>" names.
+    var street: String?
 
     var allCells: [String] { cells ?? [id] }
 
     var meta: String { "\(category) · \(area)" }
 
     var detail: String {
-        if let photoCount, let rhythm { return "\(photoCount) photos · \(rhythm)" }
-        return rhythm ?? "Added by you"
+        guard let rhythm else { return "Added by you" }
+        guard visitDays > 0 else { return rhythm }
+        return "\(visitDays) \(visitDays == 1 ? "visit" : "visits") · \(rhythm)"
     }
 
-    /// "café", "gym", "spot" — for sentences like "Same café, weekday mornings."
+    var coordinate: Coordinate { Coordinate(latitude: latitude, longitude: longitude) }
+
+    /// "café", "gym", "area", "spot" — for sentences like "Same café, weekday mornings."
     var noun: String {
         category == "Place" ? "spot" : category.lowercased()
     }

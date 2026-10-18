@@ -158,7 +158,7 @@ final class AppModel {
                 latitude: cluster.center.latitude, longitude: cluster.center.longitude,
                 photoCount: cluster.photoCount, visitDays: cluster.visitDays, rhythm: cluster.rhythm,
                 monthly: cluster.monthlyVisits, visitWeeks: cluster.visitWeeks.sorted(),
-                selected: index < 6, cells: cluster.cells
+                selected: index < 6, cells: cluster.cells, street: n.street
             )
         }
     }
@@ -224,6 +224,14 @@ final class AppModel {
     }
 
     var selectedPlaceCount: Int { places.filter(\.selected).count }
+
+    /// The person's own correction of what a place is.
+    func renamePlace(_ id: String, name: String, category: String) {
+        guard let index = places.firstIndex(where: { $0.id == id }) else { return }
+        places[index].name = name
+        places[index].category = category
+        preview = nil
+    }
 }
 
 /// Projects photo coordinates into a 0...1 square for the scan animation,
