@@ -1,0 +1,6 @@
+# Settings the Supabase CLI applies with `supabase config push`.
+project_id = "thirdplace"
+
+[auth]
+# Every sign-in option starts as an anonymous account until Apple, Google and phone are configured.
+enable_anonymous_sign_ins = true

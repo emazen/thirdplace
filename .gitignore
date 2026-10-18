@@ -1,0 +1,10 @@
+build/
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+.DS_Store
+
+# Supabase project settings for the app (URL + anon key). See supabase/Supabase.example.json.
+ThirdPlace/Supabase.json

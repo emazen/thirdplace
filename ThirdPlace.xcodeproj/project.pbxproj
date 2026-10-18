@@ -1,0 +1,296 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		7A0000000000000000000010 /* ThirdPlaceCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A0000000000000000000011 /* ThirdPlaceCore */; };
+		7A0000000000000000000013 /* ThirdPlaceBackend in Frameworks */ = {isa = PBXBuildFile; productRef = 7A0000000000000000000014 /* ThirdPlaceBackend */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		7A0000000000000000000001 /* ThirdPlace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ThirdPlace.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		7A0000000000000000000002 /* ThirdPlace */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ThirdPlace;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7A0000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A0000000000000000000010 /* ThirdPlaceCore in Frameworks */,
+				7A0000000000000000000013 /* ThirdPlaceBackend in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		7A0000000000000000000004 = {
+			isa = PBXGroup;
+			children = (
+				7A0000000000000000000002 /* ThirdPlace */,
+				7A0000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7A0000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7A0000000000000000000001 /* ThirdPlace.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		7A0000000000000000000006 /* ThirdPlace */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A0000000000000000000020 /* Build configuration list for PBXNativeTarget "ThirdPlace" */;
+			buildPhases = (
+				7A0000000000000000000007 /* Sources */,
+				7A0000000000000000000003 /* Frameworks */,
+				7A0000000000000000000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7A0000000000000000000002 /* ThirdPlace */,
+			);
+			name = ThirdPlace;
+			packageProductDependencies = (
+				7A0000000000000000000011 /* ThirdPlaceCore */,
+				7A0000000000000000000014 /* ThirdPlaceBackend */,
+			);
+			productName = ThirdPlace;
+			productReference = 7A0000000000000000000001 /* ThirdPlace.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7A0000000000000000000009 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1630;
+				LastUpgradeCheck = 1630;
+				TargetAttributes = {
+					7A0000000000000000000006 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+				};
+			};
+			buildConfigurationList = 7A0000000000000000000021 /* Build configuration list for PBXProject "ThirdPlace" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 7A0000000000000000000004;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7A0000000000000000000012 /* XCLocalSwiftPackageReference "Packages/ThirdPlaceCore" */,
+				7A0000000000000000000015 /* XCLocalSwiftPackageReference "Packages/ThirdPlaceBackend" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 7A0000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				7A0000000000000000000006 /* ThirdPlace */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7A0000000000000000000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7A0000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		7A0000000000000000000022 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		7A0000000000000000000023 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		7A0000000000000000000024 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Third Place";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Third Place reads only the location and time of your photos, on your phone, to find places you keep going back to.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = app.thirdplace.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		7A0000000000000000000025 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Third Place";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Third Place reads only the location and time of your photos, on your phone, to find places you keep going back to.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = app.thirdplace.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7A0000000000000000000020 /* Build configuration list for PBXNativeTarget "ThirdPlace" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A0000000000000000000024 /* Debug */,
+				7A0000000000000000000025 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A0000000000000000000021 /* Build configuration list for PBXProject "ThirdPlace" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A0000000000000000000022 /* Debug */,
+				7A0000000000000000000023 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		7A0000000000000000000012 /* XCLocalSwiftPackageReference "Packages/ThirdPlaceCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ThirdPlaceCore;
+		};
+		7A0000000000000000000015 /* XCLocalSwiftPackageReference "Packages/ThirdPlaceBackend" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ThirdPlaceBackend;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7A0000000000000000000011 /* ThirdPlaceCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ThirdPlaceCore;
+		};
+		7A0000000000000000000014 /* ThirdPlaceBackend */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ThirdPlaceBackend;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 7A0000000000000000000009 /* Project object */;
+}
