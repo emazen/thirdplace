@@ -34,12 +34,25 @@ Without a backend config the app runs fully on the phone with demo people. To re
 4. Copy `supabase/Supabase.example.json` to `ThirdPlace/Supabase.json` and fill in the project URL and the **anon / publishable** key (Project Settings → API). Never put the service-role key in the app.
 5. Run the app and go through onboarding again. The reveal now shows real counts, sign-up creates an account, and the feed shows real people.
 
+The chat migration (`20261018130000_chat.sql`) is applied the same way. The demo people's auto-replies at the end of `seed.sql` are for development only.
+
+## Sign-in
+
+- **Email** works today. Supabase's free plan sends a sign-in **link**; tapping it on the phone opens the app through `thirdplace://auth` and signs you in.
+  - The built-in email service only delivers to your Supabase team's own addresses and a couple of emails an hour. Before real users, connect an email provider (Authentication › Emails › SMTP Settings; Resend or Postmark both work).
+  - Once SMTP is connected, switch to 6-digit codes: uncomment the templates in `supabase/config.toml`, run `npx supabase@2 config push`, and add `"emailCodes": true` to `ThirdPlace/Supabase.json`.
+- **Skip for now** creates an anonymous account. People can add an email later from the You screen; until then the app reminds them it only lives on this phone.
+- **Sign in with Apple** is written but switched off. It needs a paid Apple Developer account:
+  1. In Xcode, sign in with that Apple ID, pick the team for the ThirdPlace target, and add the *Sign in with Apple* capability.
+  2. In Supabase: Authentication › Providers › Apple › enable, and add the app's bundle ID `app.thirdplace.ios` to the client IDs.
+  3. Add `"appleSignIn": true` to `ThirdPlace/Supabase.json`. The Apple button then appears above email.
+
 ## Tests
 
 ```sh
 cd Packages/ThirdPlaceCore && swift test       # clustering, rhythms, blurring, ranking
 cd Packages/ThirdPlaceBackend && swift test    # what's allowed to leave the phone
-supabase/tests/run-local.sh                    # schema, privacy rules, feed, likes, matches (local Postgres)
+supabase/tests/run-local.sh                    # schema, privacy rules, feed, likes, matches, chat (local Postgres)
 ```
 
 The SQL tests run the real migrations on a throwaway database in your local Postgres, with a small stand-in for Supabase's auth schema.
@@ -70,6 +83,7 @@ Tools/                         Test photo generator for the simulator
 - Presence is only uploaded for places and moments you kept, and the database rejects anything else, so home and work can't leak even by a bug.
 - Nobody can read anyone else's places or presence. The feed comes from a function that returns a category and neighbourhood ("Café · Hackney") before a match, and the venue only after a mutual like.
 - Before sign-up the app only asks "how many people share these places?", and counts under 2 are reported as 0.
+- Only matched people can message each other. Unmatching deletes the conversation for both; blocking and reporting also make sure neither person sees the other again. Reports are write-only for users.
 - Deleting the account removes the profile, places, presence, likes, matches and photos.
 
 ## Feed ranking
@@ -86,9 +100,12 @@ Working:
 - Photo-library scan, on-device clustering, home and work detection, rhythms, moments, Apple Maps venue names
 - Full onboarding and a Hinge-style feed with likes on specific parts of a profile and 8 likes a day
 - Backend: accounts, profiles, photo storage, blurred presence sync, real overlap counts, ranked feed, likes, passes, matches with venue reveal, account deletion
+- Matches and real-time chat, with openers built around the place you share; unmatch, block and report
+- Email sign-in by link, "Skip for now" accounts that can add an email later, a You screen with sign-out and delete
+- Schibsted Grotesk, Geist and Geist Mono bundled (SIL Open Font License, in `ThirdPlace/Resources/Fonts`)
 
 Not yet:
-- Sign in with Apple, Google and phone (accounts are anonymous for now and can be linked later)
+- Custom SMTP (needed before real users) and 6-digit email codes
+- Sign in with Apple (written, needs an Apple Developer account)
 - Real selfie liveness check (simulated)
-- Chat after a match
-- Bundled fonts (Schibsted Grotesk, Geist, Geist Mono; swap in `Design/Theme.swift`)
+- Push notifications for new matches and messages

@@ -15,9 +15,22 @@
 		7A0000000000000000000001 /* ThirdPlace.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ThirdPlace.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		7A0000000000000000000030 /* Exceptions for "ThirdPlace" folder in "ThirdPlace" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 7A0000000000000000000006 /* ThirdPlace */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7A0000000000000000000002 /* ThirdPlace */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				7A0000000000000000000030 /* Exceptions for "ThirdPlace" folder in "ThirdPlace" target */,
+			);
 			path = ThirdPlace;
 			sourceTree = "<group>";
 		};
@@ -196,6 +209,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ThirdPlace/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Third Place";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Third Place reads only the location and time of your photos, on your phone, to find places you keep going back to.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -225,6 +239,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ThirdPlace/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Third Place";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Third Place reads only the location and time of your photos, on your phone, to find places you keep going back to.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

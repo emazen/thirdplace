@@ -3,6 +3,7 @@ import PhotosUI
 
 struct AccountView: View {
     @Environment(AppModel.self) private var model
+    @State private var emailSheet = false
 
     var body: some View {
         let count = model.overlapCount
@@ -18,16 +19,25 @@ struct AccountView: View {
             }
             .padding(.top, 26)
         } footer: {
-            // Apple, Google and phone sign-in need provider setup in Supabase. Until then each
-            // option creates an anonymous account that can be linked to a provider later.
-            Button(model.working ? "Signing in…" : "Continue with Apple") { Task { await model.signIn() } }
-                .buttonStyle(.primary)
-            Button("Continue with Google") { Task { await model.signIn() } }
-                .buttonStyle(.secondary)
-                .padding(.top, 4)
-            Button("Continue with phone number") { Task { await model.signIn() } }
-                .buttonStyle(.secondary)
-                .padding(.top, 4)
+            EmptyView()
+                .sheet(isPresented: $emailSheet) {
+                    EmailSignInView(purpose: .signIn)
+                }
+            if model.backend == nil {
+                Button("Continue") { model.go(.basics) }
+                    .buttonStyle(.primary)
+            } else {
+                if model.appleSignInEnabled {
+                    AppleSignInButton()
+                }
+                Button("Continue with email") { emailSheet = true }
+                    .buttonStyle(model.appleSignInEnabled ? AnyButtonStyle(.secondary) : AnyButtonStyle(.primary))
+                    .padding(.top, model.appleSignInEnabled ? 4 : 0)
+                // An anonymous account that can add an email later from the You screen.
+                Button(model.working ? "Setting up…" : "Skip for now") { Task { await model.signIn() } }
+                    .buttonStyle(.quiet)
+                    .disabled(model.working)
+            }
         }
     }
 

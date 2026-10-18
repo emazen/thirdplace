@@ -1,6 +1,46 @@
-# Settings the Supabase CLI applies with `supabase config push`.
+# Auth settings applied to the hosted project with `npx supabase@2 config push`.
 project_id = "thirdplace"
 
 [auth]
-# Every sign-in option starts as an anonymous account until Apple, Google and phone are configured.
+enabled = true
+# Sign-in links in emails open the app through this URL scheme.
+site_url = "thirdplace://auth"
+additional_redirect_urls = ["thirdplace://auth"]
+enable_signup = true
+# "Skip for now" creates an anonymous account that can add an email later.
 enable_anonymous_sign_ins = true
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[auth.email]
+enable_signup = true
+# 6-digit codes for when custom SMTP templates are enabled (see below).
+otp_length = 6
+otp_expiry = 3600
+double_confirm_changes = true
+# Emails must be confirmed before they count, so nobody can claim an address they don't own.
+enable_confirmations = true
+max_frequency = "60s"
+
+# Custom templates (a 6-digit code instead of a link) need a custom SMTP provider: the free
+# plan's built-in email can't use custom templates and only delivers to the project team.
+# Once SMTP is set up (Authentication > Emails > SMTP Settings), uncomment these, set
+# "emailCodes": true in ThirdPlace/Supabase.json, and run `npx supabase@2 config push`.
+#
+# [auth.email.template.magic_link]
+# subject = "Your Third Place code"
+# content_path = "./supabase/templates/code.html"
+#
+# [auth.email.template.confirmation]
+# subject = "Your Third Place code"
+# content_path = "./supabase/templates/code.html"
+#
+# [auth.email.template.email_change]
+# subject = "Confirm your email for Third Place"
+# content_path = "./supabase/templates/code.html"
+
+[auth.external.apple]
+# Turned on once there is an Apple Developer account. See README › Sign in with Apple.
+enabled = false
+client_id = ""
+secret = ""

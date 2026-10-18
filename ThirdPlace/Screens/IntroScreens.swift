@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WelcomeView: View {
     @Environment(AppModel.self) private var model
+    @State private var signingIn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -22,8 +23,13 @@ struct WelcomeView: View {
             VStack(spacing: 6) {
                 Button("Get started") { model.go(.how) }
                     .buttonStyle(.primary)
-                Button("I already have an account") { model.go(.account) }
-                    .buttonStyle(.quiet)
+                Button("I already have an account") {
+                    if model.backend == nil { model.go(.account) } else { signingIn = true }
+                }
+                .buttonStyle(.quiet)
+                .sheet(isPresented: $signingIn) {
+                    EmailSignInView(purpose: .signIn)
+                }
             }
             .padding(.top, 26)
         }

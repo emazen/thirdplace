@@ -7,9 +7,13 @@ import ThirdPlaceCore
 public final class BackendClient: Sendable {
     public static let photoBucket = "profile-photos"
 
+    public static let redirectURL = URL(string: "thirdplace://auth")!
+
     private let client: SupabaseClient
+    public let config: BackendConfig
 
     public init(config: BackendConfig) {
+        self.config = config
         client = SupabaseClient(
             supabaseURL: config.url,
             supabaseKey: config.anonKey,
@@ -33,6 +37,65 @@ public final class BackendClient: Sendable {
 
     public func signOut() async throws {
         try await client.auth.signOut()
+    }
+
+    /// True for accounts made with "Skip for now"; they can add an email later without losing anything.
+    public var isAnonymous: Bool {
+        client.auth.currentSession?.user.isAnonymous ?? false
+    }
+
+    public var email: String? {
+        guard let email = client.auth.currentSession?.user.email, !email.isEmpty else { return nil }
+        return email
+    }
+
+    /// Fetches the latest account state (for example after confirming an email change).
+    public func refreshAccount() async {
+        _ = try? await client.auth.refreshSession()
+    }
+
+    /// Emails a sign-in link (or a 6-digit code, once custom templates are on).
+    /// Creates the account if this email is new.
+    public func sendCode(to email: String) async throws {
+        try await client.auth.signInWithOTP(email: email, redirectTo: Self.redirectURL, shouldCreateUser: true)
+    }
+
+    /// Finishes sign-in from a link in the email (thirdplace://auth?code=…).
+    @discardableResult
+    public func handleAuthLink(_ url: URL) async throws -> UUID {
+        try await client.auth.session(from: url).user.id
+    }
+
+    @discardableResult
+    public func verifyCode(_ code: String, email: String) async throws -> UUID {
+        let response = try await client.auth.verifyOTP(email: email, token: code, type: .email)
+        return response.user.id
+    }
+
+    /// Attaches an email to the current (anonymous) account. A 6-digit code is emailed to confirm it.
+    public func addEmail(_ email: String) async throws {
+        _ = try await client.auth.update(user: UserAttributes(email: email), redirectTo: Self.redirectURL)
+    }
+
+    public func confirmAddedEmail(_ code: String, email: String) async throws {
+        _ = try await client.auth.verifyOTP(email: email, token: code, type: .emailChange)
+    }
+
+    /// Sign in with Apple. Pass the identity token and the raw nonce used for the request.
+    @discardableResult
+    public func signInWithApple(idToken: String, nonce: String) async throws -> UUID {
+        let session = try await client.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
+        )
+        return session.user.id
+    }
+
+    /// Whether this account already finished onboarding (has a profile row).
+    public func hasProfile() async throws -> Bool {
+        guard let user = currentUserID else { return false }
+        struct Row: Decodable { let id: UUID }
+        let rows: [Row] = try await client.from("profiles").select("id").eq("id", value: user).execute().value
+        return !rows.isEmpty
     }
 
     public func deleteAccount(photoPaths: [String]) async throws {
@@ -112,6 +175,75 @@ public final class BackendClient: Sendable {
 
     public func matches() async throws -> [MatchRow] {
         try await client.rpc("get_matches").execute().value
+    }
+}
+
+// MARK: - Chat
+
+extension BackendClient {
+    /// Conversations are keyed by the two ids in sorted order, the same way the database stores them.
+    static func pair(_ x: UUID, _ y: UUID) -> (UUID, UUID) {
+        x.uuidString.lowercased() < y.uuidString.lowercased() ? (x, y) : (y, x)
+    }
+
+    public func messages(with other: UUID, before: Int? = nil) async throws -> [ChatMessage] {
+        struct Params: Encodable { let other: UUID; let before_id: Int?; let max_results: Int }
+        return try await client
+            .rpc("get_messages", params: Params(other: other, before_id: before, max_results: 50))
+            .execute()
+            .value
+    }
+
+    @discardableResult
+    public func send(_ body: String, to other: UUID) async throws -> ChatMessage {
+        struct Params: Encodable { let other: UUID; let body: String }
+        return try await client.rpc("send_message", params: Params(other: other, body: body)).execute().value
+    }
+
+    public func markRead(from other: UUID) async throws {
+        struct Params: Encodable { let other: UUID }
+        try await client.rpc("mark_read", params: Params(other: other)).execute()
+    }
+
+    public func unmatch(_ other: UUID) async throws {
+        struct Params: Encodable { let other: UUID }
+        try await client.rpc("unmatch_person", params: Params(other: other)).execute()
+    }
+
+    public func block(_ other: UUID) async throws {
+        struct Params: Encodable { let other: UUID }
+        try await client.rpc("block_person", params: Params(other: other)).execute()
+    }
+
+    public func report(_ other: UUID, reason: ReportReason, details: String? = nil) async throws {
+        struct Params: Encodable { let other: UUID; let reason: String; let details: String? }
+        try await client.rpc("report_person", params: Params(other: other, reason: reason.rawValue, details: details)).execute()
+    }
+
+    /// New messages in one conversation as they arrive (both directions).
+    public func liveMessages(with other: UUID) -> AsyncStream<ChatMessage> {
+        guard let me = currentUserID else { return AsyncStream { $0.finish() } }
+        let (a, b) = Self.pair(me, other)
+        let client = self.client
+        let channel = client.channel("chat-\(a.uuidString.lowercased())-\(b.uuidString.lowercased())")
+        let inserts = channel.postgresChange(InsertAction.self, schema: "public", table: "messages",
+                                             filter: .eq("user_a", value: a))
+        return AsyncStream { continuation in
+            let task = Task {
+                try? await channel.subscribeWithError()
+                for await insert in inserts {
+                    if let message = try? insert.decodeRecord(as: ChatMessage.self, decoder: JSONDecoder()),
+                       message.userB == b {
+                        continuation.yield(message)
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+                Task { await client.removeChannel(channel) }
+            }
+        }
     }
 }
 
