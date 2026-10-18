@@ -31,17 +31,17 @@ enum Theme {
     static let radius: CGFloat = 20
 }
 
-/// One place to swap in Schibsted Grotesk / Geist / Geist Mono once the font files are bundled.
+/// Schibsted Grotesk for headlines, Geist for text, Geist Mono for data (coordinates, dates, counts).
 enum TPFont {
     static func display(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .default)
+        .custom(FontRegistry.display, size: size).weight(weight)
     }
 
     static func body(_ size: CGFloat = 16, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .default)
+        .custom(FontRegistry.body, size: size).weight(weight)
     }
 
     static func mono(_ size: CGFloat = 11, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .monospaced)
+        .custom(FontRegistry.mono, size: size).weight(weight)
     }
 }
