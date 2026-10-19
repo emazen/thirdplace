@@ -246,6 +246,28 @@ struct YouView: View {
                     .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
                     .padding(.top, 10)
 
+                    MonoLabel(text: "Your places").padding(.top, 24)
+                    Button {
+                        dismiss()
+                        model.startRescan()
+                    } label: {
+                        row {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Rescan my photos").font(TPFont.body(15)).foregroundStyle(Theme.ink)
+                                Text("Pick up new photos and fix place names. Your matches stay.")
+                                    .font(TPFont.body(13))
+                                    .foregroundStyle(Theme.ink2)
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.clockwise").font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.ink2)
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .background(RoundedRectangle(cornerRadius: Theme.radius).fill(Theme.surface))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
+                    .padding(.top, 10)
+
                     VStack(spacing: 0) {
                         Button {
                             if model.isAnonymousAccount { confirmSignOut = true } else { Task { await model.signOut() } }

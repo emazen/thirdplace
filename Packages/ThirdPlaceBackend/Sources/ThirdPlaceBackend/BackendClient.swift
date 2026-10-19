@@ -14,11 +14,43 @@ public final class BackendClient: Sendable {
 
     public init(config: BackendConfig) {
         self.config = config
+        // Fail fast instead of hanging for a minute when the server's proxy drops a connection.
+        let sessionConfig = URLSessionConfiguration.default
+        sessionConfig.timeoutIntervalForRequest = 15
+        sessionConfig.waitsForConnectivity = false
         client = SupabaseClient(
             supabaseURL: config.url,
             supabaseKey: config.anonKey,
-            options: SupabaseClientOptions(auth: .init(emitLocalSessionAsInitialSession: true))
+            options: SupabaseClientOptions(
+                auth: .init(emitLocalSessionAsInitialSession: true),
+                global: .init(session: URLSession(configuration: sessionConfig))
+            )
         )
+    }
+
+    /// Retries reads that hit a timeout or a 5xx from the proxy in front of Supabase,
+    /// which happens now and then on the free plan.
+    func retrying<T>(_ attempts: Int = 3, _ operation: () async throws -> T) async throws -> T {
+        var lastError: Error?
+        for attempt in 0..<attempts {
+            do {
+                return try await operation()
+            } catch {
+                lastError = error
+                guard Self.isTransient(error), attempt < attempts - 1 else { throw error }
+                try? await Task.sleep(for: .milliseconds(600 * (attempt + 1)))
+            }
+        }
+        throw lastError ?? BackendError.notSignedIn
+    }
+
+    static func isTransient(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            return [.timedOut, .networkConnectionLost, .cannotConnectToHost, .notConnectedToInternet].contains(urlError.code)
+        }
+        let text = String(describing: error)
+        return ["Status Code: 502", "Status Code: 503", "Status Code: 504", "Status Code: 520", "Status Code: 522", "Status Code: 524"]
+            .contains { text.contains($0) }
     }
 
     // MARK: Account
@@ -94,7 +126,9 @@ public final class BackendClient: Sendable {
     public func hasProfile() async throws -> Bool {
         guard let user = currentUserID else { return false }
         struct Row: Decodable { let id: UUID }
-        let rows: [Row] = try await client.from("profiles").select("id").eq("id", value: user).execute().value
+        let rows: [Row] = try await retrying {
+            try await client.from("profiles").select("id").eq("id", value: user).execute().value
+        }
         return !rows.isEmpty
     }
 
@@ -143,21 +177,23 @@ public final class BackendClient: Sendable {
     public func preview(_ places: [(key: String, cells: [String])]) async throws -> OverlapPreview {
         struct Candidate: Encodable { let key: String; let cells: [String] }
         struct Params: Encodable { let candidate_places: [Candidate] }
-        return try await client
-            .rpc("preview_overlaps", params: Params(candidate_places: places.map { Candidate(key: $0.key, cells: $0.cells) }))
-            .execute()
-            .value
+        let params = Params(candidate_places: places.map { Candidate(key: $0.key, cells: $0.cells) })
+        return try await retrying {
+            try await client.rpc("preview_overlaps", params: params).execute().value
+        }
     }
 
     // MARK: Feed
 
     public func feed(limit: Int = 20) async throws -> [FeedRow] {
         struct Params: Encodable { let max_results: Int }
-        return try await client.rpc("get_feed", params: Params(max_results: limit)).execute().value
+        return try await retrying {
+            try await client.rpc("get_feed", params: Params(max_results: limit)).execute().value
+        }
     }
 
     public func likesLeft() async throws -> Int {
-        try await client.rpc("likes_left").execute().value
+        try await retrying { try await client.rpc("likes_left").execute().value }
     }
 
     public func like(_ person: UUID, item: String, comment: String? = nil) async throws -> LikeResult {
@@ -174,7 +210,7 @@ public final class BackendClient: Sendable {
     }
 
     public func matches() async throws -> [MatchRow] {
-        try await client.rpc("get_matches").execute().value
+        try await retrying { try await client.rpc("get_matches").execute().value }
     }
 }
 
@@ -188,10 +224,10 @@ extension BackendClient {
 
     public func messages(with other: UUID, before: Int? = nil) async throws -> [ChatMessage] {
         struct Params: Encodable { let other: UUID; let before_id: Int?; let max_results: Int }
-        return try await client
-            .rpc("get_messages", params: Params(other: other, before_id: before, max_results: 50))
-            .execute()
-            .value
+        let params = Params(other: other, before_id: before, max_results: 50)
+        return try await retrying {
+            try await client.rpc("get_messages", params: params).execute().value
+        }
     }
 
     @discardableResult

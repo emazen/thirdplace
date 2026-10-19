@@ -1,4 +1,5 @@
 import UIKit
+import SwiftUI
 import ThirdPlaceBackend
 
 extension AppModel {
@@ -19,11 +20,11 @@ extension AppModel {
             preview = OverlapPreview(places: [:], total: 0)
             return
         }
+        previewFailed = false
         do {
             preview = try await backend.preview(input)
         } catch {
-            preview = OverlapPreview(places: [:], total: 0)
-            errorMessage = "Couldn’t reach Third Place. \(FriendlyError.message(error))"
+            previewFailed = true
         }
     }
 
@@ -97,6 +98,30 @@ extension AppModel {
             moments: keptMoments.map { (area5: $0.area5, start: $0.start, end: $0.end) }
         )
         _ = try await backend.sync(places: placeUploads, moments: momentUploads, presence: presence)
+    }
+
+    // MARK: Rescan
+
+    /// Scan the photo library again (new photos, better naming) without touching the account.
+    func startRescan() {
+        rescanning = true
+        scan = ScanState()
+        preview = nil
+        restartFlow(at: .scan)
+    }
+
+    /// After reviewing places and moments: replace what's shared, then back to the feed.
+    func finishRescan() async {
+        working = true
+        defer { working = false }
+        do {
+            try await syncPlaces()
+            rescanning = false
+            remotePeople = nil
+            finishOnboarding()
+        } catch {
+            errorMessage = "Couldn’t update your places. \(FriendlyError.message(error))"
+        }
     }
 
     func deleteAccount() async {

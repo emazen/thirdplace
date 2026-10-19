@@ -24,10 +24,14 @@ final class AppModel {
     /// This session's photo points, kept in memory only, for the blurred presence upload.
     var scanPoints: [PhotoPoint] = []
     var preview: OverlapPreview?
+    /// The reveal couldn't reach the server; it offers a retry instead of a misleading zero.
+    var previewFailed = false
     var remotePeople: [FeedPerson]?
     var matches: [MatchRow] = []
     /// Set when an email sign-in link was opened, so the email sheet can close itself.
     var authLinkCompleted = false
+    /// True while an existing account re-runs the scan from the You screen.
+    var rescanning = false
     var working = false
     var errorMessage: String?
 
@@ -69,6 +73,13 @@ final class AppModel {
         withAnimation(.smooth(duration: 0.35)) { step = previous }
     }
 
+    /// Starts a fresh run of the flow at `next`, with nothing to go back to.
+    func restartFlow(at next: Step) {
+        history = []
+        direction = .trailing
+        withAnimation(.smooth(duration: 0.35)) { step = next }
+    }
+
     func finishOnboarding() {
         persist(onboarded: true)
         history = []
@@ -90,6 +101,7 @@ final class AppModel {
         preview = nil
         remotePeople = nil
         matches = []
+        rescanning = false
         history = []
         direction = .leading
         withAnimation(.smooth(duration: 0.35)) { step = .welcome }

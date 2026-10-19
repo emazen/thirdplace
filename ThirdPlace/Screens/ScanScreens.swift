@@ -237,8 +237,15 @@ struct PlacesView: View {
             let count = model.selectedPlaceCount
             Button(count == 0 ? "Skip for now" : "Keep \(count) \(count == 1 ? "place" : "places")") {
                 let hasMoments = !model.moments.isEmpty && model.access != .denied
-                model.go(hasMoments ? .moments : .reveal)
+                if hasMoments {
+                    model.go(.moments)
+                } else if model.rescanning {
+                    Task { await model.finishRescan() }
+                } else {
+                    model.go(.reveal)
+                }
             }
+            .disabled(model.working)
             .buttonStyle(.primary)
             .sheet(item: $fixing) { place in
                 PlaceFixSheet(place: place)
@@ -519,8 +526,15 @@ struct MomentsView: View {
                 .padding(.top, 16)
                 .padding(.horizontal, 2)
         } footer: {
-            Button("Continue") { model.go(.reveal) }
-                .buttonStyle(.primary)
+            Button(model.rescanning ? (model.working ? "Saving…" : "Save my places") : "Continue") {
+                if model.rescanning {
+                    Task { await model.finishRescan() }
+                } else {
+                    model.go(.reveal)
+                }
+            }
+            .buttonStyle(.primary)
+            .disabled(model.working)
         }
     }
 }
@@ -550,7 +564,15 @@ private struct LiveRevealView: View {
             return (place, n)
         }
         StepScaffold {
-            if model.preview == nil {
+            if model.previewFailed {
+                Headline(text: "Couldn’t reach Third Place.")
+                    .padding(.top, 12)
+                Subhead(text: "Your places are safe on this phone. Check your connection and try again.")
+                    .padding(.top, 12)
+                Button("Try again") { Task { await model.loadPreview() } }
+                    .buttonStyle(.secondary)
+                    .padding(.top, 20)
+            } else if model.preview == nil {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 300)
             } else if total == 0 {

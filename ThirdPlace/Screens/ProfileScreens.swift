@@ -19,10 +19,6 @@ struct AccountView: View {
             }
             .padding(.top, 26)
         } footer: {
-            EmptyView()
-                .sheet(isPresented: $emailSheet) {
-                    EmailSignInView(purpose: .signIn)
-                }
             if model.backend == nil {
                 Button("Continue") { model.go(.basics) }
                     .buttonStyle(.primary)
@@ -33,6 +29,9 @@ struct AccountView: View {
                 Button("Continue with email") { emailSheet = true }
                     .buttonStyle(model.appleSignInEnabled ? AnyButtonStyle(.secondary) : AnyButtonStyle(.primary))
                     .padding(.top, model.appleSignInEnabled ? 4 : 0)
+                    .sheet(isPresented: $emailSheet) {
+                        EmailSignInView(purpose: .signIn)
+                    }
                 // An anonymous account that can add an email later from the You screen.
                 Button(model.working ? "Setting up…" : "Skip for now") { Task { await model.signIn() } }
                     .buttonStyle(.quiet)
