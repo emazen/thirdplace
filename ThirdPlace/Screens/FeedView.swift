@@ -1,4 +1,5 @@
 import SwiftUI
+import ThirdPlaceBackend
 
 /// Everyone you crossed paths with, one profile at a time. Like a specific part of a profile,
 /// Hinge-style; places stay vague until you both like each other.
@@ -162,16 +163,18 @@ struct FeedView: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Headline(text: "No one yet.")
-            Subhead(text: model.backend == nil
-                    ? "New people appear as you add photos at your places. Check back after your next coffee."
-                    : "You’re early here. New people show up as they join around your places. Pull to refresh.")
-            Spacer()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Headline(text: "No one yet.")
+                Subhead(text: model.backend == nil
+                        ? "New people appear as you add photos at your places. Check back after your next coffee."
+                        : "You’re early here. New people show up as they join around your places. Pull to refresh.")
+            }
+            .padding(.horizontal, Theme.gutter)
+            .padding(.top, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, Theme.gutter)
-        .padding(.top, 24)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .refreshable { await model.loadFeed() }
     }
 
     private func like(_ part: String, person: FeedPerson) {
@@ -226,10 +229,41 @@ struct FeedView: View {
     }
 }
 
-private struct ProfileCard: View {
+/// One profile, Hinge-style: photos, prompts and where you crossed, each of which can be liked.
+struct ProfileCard: View {
     let person: FeedPerson
     let liked: String?
+    /// Your own profile as others see it: nothing to like.
+    var preview = false
     let onLike: (String) -> Void
+
+    private enum Section: Hashable {
+        case photo(Int), prompt(Int), first, second
+    }
+
+    /// Main photo and the best crossing first, then prompts and photos taking turns.
+    private var sections: [Section] {
+        var result: [Section] = [.photo(0), .first]
+        var photo = 1
+        var prompt = 0
+        var placedSecond = person.second == nil
+        while photo < person.photoCount || prompt < person.prompts.count {
+            if prompt < person.prompts.count {
+                result.append(.prompt(prompt))
+                prompt += 1
+            }
+            if photo < person.photoCount {
+                result.append(.photo(photo))
+                photo += 1
+            }
+            if !placedSecond {
+                result.append(.second)
+                placedSecond = true
+            }
+        }
+        if !placedSecond { result.append(.second) }
+        return result
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -253,43 +287,62 @@ private struct ProfileCard: View {
             }
             .padding(.bottom, 6)
 
-            PhotoBlock(tone: person.tones.0, label: "Photo 1", path: person.photoPaths.first) {
-                LikeButton(isLiked: liked == "photo1", large: true, label: "Like \(person.name)’s first photo") { onLike("photo1") }
-            }
-
-            CrossingCard(crossing: person.first, theirName: person.name) {
-                LikeButton(isLiked: liked == "first", label: "Like where you crossed") { onLike("first") }
-            }
-
-            if let prompt = person.prompt {
-                Card(padding: 18) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(prompt.q)
-                            .font(TPFont.body(14, weight: .medium))
-                            .foregroundStyle(Theme.ink2)
-                        Text(prompt.a)
-                            .font(TPFont.display(24, weight: .medium))
-                            .tracking(-0.6)
-                            .foregroundStyle(Theme.ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.trailing, 56)
+            ForEach(sections, id: \.self) { section in
+                switch section {
+                case .photo(let index):
+                    photo(index)
+                case .prompt(let index):
+                    prompt(person.prompts[index], index: index)
+                case .first:
+                    CrossingCard(crossing: person.first, theirName: person.name) {
+                        like("first", label: "Like where you crossed")
+                    }
+                case .second:
+                    if let second = person.second {
+                        CrossingCard(crossing: second, theirName: person.name) {
+                            like("second", label: "Like this overlap")
+                        }
                     }
                 }
-                .overlay(alignment: .bottomTrailing) {
-                    LikeButton(isLiked: liked == "prompt", label: "Like \(person.name)’s answer") { onLike("prompt") }
-                        .padding(14)
-                }
             }
+        }
+    }
 
-            PhotoBlock(tone: person.tones.1, label: "Photo 2", path: person.photoPaths.dropFirst().first) {
-                LikeButton(isLiked: liked == "photo2", large: true, label: "Like \(person.name)’s second photo") { onLike("photo2") }
-            }
+    private func photo(_ index: Int) -> some View {
+        let tones = [person.tones.0, person.tones.1]
+        return PhotoBlock(
+            tone: tones[index % 2],
+            label: "Photo \(index + 1)",
+            path: index < person.photoPaths.count ? person.photoPaths[index] : nil,
+            image: index < person.localPhotos.count ? person.localPhotos[index] : nil
+        ) {
+            like("photo\(index + 1)", large: true, label: index == 0 ? "Like \(person.name)’s main photo" : "Like \(person.name)’s photo \(index + 1)")
+        }
+    }
 
-            if let second = person.second {
-                CrossingCard(crossing: second, theirName: person.name) {
-                    LikeButton(isLiked: liked == "second", label: "Like this overlap") { onLike("second") }
-                }
+    private func prompt(_ prompt: ProfilePrompt, index: Int) -> some View {
+        Card(padding: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(prompt.question)
+                    .font(TPFont.body(14, weight: .medium))
+                    .foregroundStyle(Theme.ink2)
+                Text(prompt.answer)
+                    .font(TPFont.display(24, weight: .medium))
+                    .tracking(-0.6)
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.trailing, preview ? 0 : 56)
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            like("prompt\(index + 1)", label: "Like \(person.name)’s answer").padding(14)
+        }
+    }
+
+    @ViewBuilder
+    private func like(_ part: String, large: Bool = false, label: String) -> some View {
+        if !preview {
+            LikeButton(isLiked: liked == part, large: large, label: label) { onLike(part) }
         }
     }
 }
@@ -299,6 +352,7 @@ private struct PhotoBlock<Accessory: View>: View {
     let tone: UInt32
     let label: String
     var path: String? = nil
+    var image: UIImage? = nil
     @ViewBuilder var accessory: Accessory
     @State private var url: URL?
 
@@ -307,7 +361,9 @@ private struct PhotoBlock<Accessory: View>: View {
             .fill(Color(hex: tone))
             .frame(height: 420)
             .overlay {
-                if let url {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else if let url {
                     AsyncImage(url: url) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFill()
@@ -323,7 +379,7 @@ private struct PhotoBlock<Accessory: View>: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
             .overlay(alignment: .topLeading) {
-                if url == nil {
+                if url == nil && image == nil {
                     MonoLabel(text: label, color: Color(hex: 0x3A3A38), size: 10)
                         .padding(14)
                 }

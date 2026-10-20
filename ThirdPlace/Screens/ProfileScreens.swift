@@ -98,14 +98,14 @@ struct BasicsView: View {
     }
 }
 
-private struct FieldLabel: View {
+struct FieldLabel: View {
     let text: String
     var body: some View {
         Text(text).font(TPFont.body(13, weight: .medium)).foregroundStyle(Theme.ink2)
     }
 }
 
-private struct ChipGroup: View {
+struct ChipGroup: View {
     let title: String
     let options: [String]
     @Binding var selection: String
@@ -137,73 +137,29 @@ private struct ChipGroup: View {
 
 struct PhotosStepView: View {
     @Environment(AppModel.self) private var model
-    @State private var picked: [PhotosPickerItem] = []
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+    @State private var photos: [EditablePhoto] = []
 
     var body: some View {
         StepScaffold {
             Headline(text: "Add a few photos.")
             Subhead(text: "At least two. Recent ones, where your face is clear.")
                 .padding(.top, 12)
-            LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(0..<6, id: \.self) { index in
-                    if index < model.profilePhotos.count {
-                        Color.clear
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 144)
-                            .overlay {
-                                Image(uiImage: model.profilePhotos[index])
-                                    .resizable()
-                                    .scaledToFill()
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(alignment: .bottomLeading) {
-                                MonoLabel(text: index == 0 ? "Main" : "Photo \(index + 1)", color: Theme.ink, size: 10)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(RoundedRectangle(cornerRadius: 6).fill(Theme.surface))
-                                    .padding(8)
-                            }
-                            .contextMenu {
-                                Button("Remove", role: .destructive) { model.profilePhotos.remove(at: index) }
-                            }
-                    } else {
-                        let isNext = index == model.profilePhotos.count
-                        PhotosPicker(selection: $picked, maxSelectionCount: 6 - model.profilePhotos.count, matching: .images) {
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Theme.surface)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .strokeBorder(isNext ? Theme.ink : Theme.strong, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                                )
-                                .overlay(Image(systemName: "plus").font(.system(size: 20, weight: .light)).foregroundStyle(isNext ? Theme.ink : Theme.mute))
-                                .frame(height: 144)
-                        }
-                        .accessibilityLabel("Add photo")
-                    }
-                }
-            }
-            .padding(.top, 24)
-            Text(model.profilePhotos.count >= 2 ? "\(model.profilePhotos.count) of 6 added. Hold a photo to remove it." : "Tap + to add \(model.profilePhotos.count == 1 ? "one more" : "two") to continue.")
+            PhotoGrid(photos: $photos)
+                .padding(.top, 24)
+            Text(photos.count >= 2 ? "\(photos.count) of 6 added. Hold a photo to move or remove it." : "Tap + to add \(photos.count == 1 ? "one more" : "two") to continue.")
                 .font(TPFont.body(14))
                 .foregroundStyle(Theme.ink2)
                 .padding(.top, 14)
         } footer: {
-            Button("Continue") { model.go(.verify) }
+            Button("Continue") { model.go(.prompts) }
                 .buttonStyle(.primary)
-                .disabled(model.profilePhotos.count < 2)
+                .disabled(photos.count < 2)
         }
-        .onChange(of: picked) { _, items in
-            guard !items.isEmpty else { return }
-            Task {
-                for item in items {
-                    if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data), model.profilePhotos.count < 6 {
-                        model.profilePhotos.append(image)
-                    }
-                }
-                picked = []
-            }
+        .onAppear { photos = model.profilePhotos.map { EditablePhoto(image: $0) } }
+        .onChange(of: photos) { _, value in
+            model.profilePhotos = value.map(\.image)
+            // Paths from an earlier, failed sign-up no longer line up with these photos.
+            model.profile.photoPaths = []
         }
     }
 }

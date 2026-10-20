@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 import ThirdPlaceBackend
 
 /// One profile in the feed: a real person from the server, or a demo stand-in when no backend
@@ -32,9 +32,14 @@ struct FeedPerson: Identifiable, Hashable {
     let tones: (UInt32, UInt32)
     let first: Crossing
     let second: Crossing?
-    let prompt: (q: String, a: String)?
+    let prompts: [ProfilePrompt]
     var remoteID: UUID? = nil
     var photoPaths: [String] = []
+    /// Your own photos, for previewing your profile.
+    var localPhotos: [UIImage] = []
+
+    /// Everyone has at least two photos; demo people show two placeholders.
+    var photoCount: Int { max(2, photoPaths.count, localPhotos.count) }
 
     static func == (lhs: FeedPerson, rhs: FeedPerson) -> Bool { lhs.id == rhs.id && lhs.remoteID == rhs.remoteID }
     func hash(into hasher: inout Hasher) {
@@ -95,8 +100,6 @@ extension FeedPerson {
         let crossings = row.crossings.compactMap(Self.crossing(from:))
         guard let first = crossings.first else { return nil }
         let tone = Self.palette[abs(row.personID.hashValue) % Self.palette.count]
-        var prompt: (q: String, a: String)?
-        if let q = row.promptQuestion, let a = row.promptAnswer { prompt = (q, a) }
         self.init(
             id: index,
             name: row.firstName,
@@ -105,7 +108,7 @@ extension FeedPerson {
             tones: tone,
             first: first,
             second: crossings.dropFirst().first,
-            prompt: prompt,
+            prompts: row.prompts,
             remoteID: row.personID,
             photoPaths: row.photoPaths
         )
@@ -158,14 +161,14 @@ enum DemoPeople {
         (0xDDD2C6, 0xC9D8D8), (0xDACBD5, 0xD2D6CC), (0xCDD6DD, 0xDDD5CB)
     ]
 
-    private static let prompts: [(String, String)] = [
-        ("My third place is…", "The lido at 8 am, before anyone else is up."),
-        ("Best place I’ve been to twice", "A tiny bookshop that still writes receipts by hand. Third visit pending."),
-        ("A perfect Sunday", "Long run, longer breakfast, a film I’ve already seen."),
-        ("I’ll know it’s going well if…", "We find a café neither of us has been to yet."),
-        ("Unpopular opinion", "Bad weather is the best weather for a walk."),
-        ("You’ll find me", "Front left at every gig, whether I like the band or not."),
-        ("Green flag", "You know the barista’s name.")
+    private static let prompts: [ProfilePrompt] = [
+        .init(question: "My third place is…", answer: "The lido at 8 am, before anyone else is up."),
+        .init(question: "I’m a regular at…", answer: "A tiny bookshop that still writes receipts by hand."),
+        .init(question: "My ideal Sunday…", answer: "Long run, longer breakfast, a film I’ve already seen."),
+        .init(question: "I’ll know it’s going well if…", answer: "We find a café neither of us has been to yet."),
+        .init(question: "My most controversial opinion…", answer: "Bad weather is the best weather for a walk."),
+        .init(question: "You’ll find me on a Sunday…", answer: "Front left at every gig, whether I like the band or not."),
+        .init(question: "Green flags I look for…", answer: "You know the barista’s name.")
     ]
 
     static func make(places: [MyPlace], moments: [MyMoment]) -> [FeedPerson] {
@@ -201,7 +204,7 @@ enum DemoPeople {
                 tones: tones[i % tones.count],
                 first: crossings[0].0,
                 second: crossings.count > 1 ? crossings[1].0 : nil,
-                prompt: prompts[i % prompts.count]
+                prompts: [prompts[i % prompts.count], prompts[(i + 3) % prompts.count]]
             ))
         }
         return people

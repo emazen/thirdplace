@@ -24,22 +24,29 @@ as $$
 $$;
 
 create temp table demo_people (key text, id uuid, first_name text, birthday date, gender text, show_me text,
-                               intent text, question text, answer text);
+                               intent text, prompts jsonb);
 insert into demo_people values
   ('maya',  'd0000000-0000-4000-8000-000000000001', 'Maya',  '1997-03-12', 'woman',     'everyone', 'both',
-   'My third place is…', 'The lido at 8 am, before anyone else is up.'),
+   '[{"q": "My third place is…", "a": "The lido at 8 am, before anyone else is up."},
+     {"q": "We’ll get along if…", "a": "You think a long breakfast counts as a plan."}]'),
   ('jonah', 'd0000000-0000-4000-8000-000000000002', 'Jonah', '1995-07-02', 'man',       'everyone', 'both',
-   'Best place I’ve been to twice', 'A tiny bookshop that still writes receipts by hand.'),
+   '[{"q": "I’m a regular at…", "a": "A tiny bookshop that still writes receipts by hand."},
+     {"q": "I’m weirdly good at…", "a": "Guessing what someone will order before they do."}]'),
   ('leila', 'd0000000-0000-4000-8000-000000000003', 'Leila', '1999-01-20', 'woman',     'everyone', 'both',
-   'A perfect Sunday', 'Long swim, longer breakfast, a film I’ve already seen.'),
+   '[{"q": "My ideal Sunday…", "a": "Long swim, longer breakfast, a film I’ve already seen."},
+     {"q": "The last great thing I ate…", "a": "A peach, standing over the sink. Life-changing."}]'),
   ('sam',   'd0000000-0000-4000-8000-000000000004', 'Sam',   '1996-10-08', 'man',       'everyone', 'both',
-   'Unpopular opinion', 'Bad weather is the best weather for a walk.'),
+   '[{"q": "My most controversial opinion…", "a": "Bad weather is the best weather for a walk."},
+     {"q": "A perfect first date…", "a": "Somewhere with a counter, so we can watch the kitchen."}]'),
   ('ana',   'd0000000-0000-4000-8000-000000000005', 'Ana',   '1998-05-27', 'woman',     'everyone', 'both',
-   'You’ll find me', 'Front left at every gig, whether I like the band or not.'),
+   '[{"q": "You’ll find me…", "a": "Front left at every gig, whether I like the band or not."},
+     {"q": "If you see me there, say…", "a": "What you’re reading. I’ll tell you what I’m reading."}]'),
   ('theo',  'd0000000-0000-4000-8000-000000000006', 'Theo',  '1994-12-14', 'man',       'everyone', 'both',
-   'Green flag', 'You know the barista’s name.'),
+   '[{"q": "Green flags I look for…", "a": "You know the barista’s name."},
+     {"q": "The best spot in my neighbourhood…", "a": "The bench outside the flower market at 4 pm on a Sunday."}]'),
   ('noor',  'd0000000-0000-4000-8000-000000000007', 'Noor',  '2000-08-30', 'nonbinary', 'everyone', 'both',
-   'I’ll know it’s going well if…', 'We find a café neither of us has been to yet.');
+   '[{"q": "I’ll know it’s going well if…", "a": "We find a café neither of us has been to yet."},
+     {"q": "Teach me something about…", "a": "Bouldering. I will absolutely over-explain the grading."}]');
 
 insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
 select id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
@@ -47,8 +54,8 @@ select id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticat
 from demo_people
 on conflict (id) do nothing;
 
-insert into public.profiles (id, first_name, birthday, gender, show_me, intent, prompt_question, prompt_answer, verified, is_demo)
-select id, first_name, birthday, gender, show_me, intent, question, answer, true, true
+insert into public.profiles (id, first_name, birthday, gender, show_me, intent, prompts, verified, is_demo)
+select id, first_name, birthday, gender, show_me, intent, prompts, true, true
 from demo_people
 on conflict (id) do nothing;
 

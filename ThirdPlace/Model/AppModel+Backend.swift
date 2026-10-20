@@ -57,20 +57,13 @@ extension AppModel {
         defer { working = false }
         do {
             let user = try await backend.signIn()
-            var paths: [String] = []
-            for (index, image) in profilePhotos.enumerated() {
-                guard let jpeg = image.resizedForUpload().jpegData(compressionQuality: 0.82) else { continue }
-                paths.append(try await backend.uploadPhoto(jpeg, index: index))
+            // A retry after a failed save reuses photos that already went up.
+            var paths = Array(profile.photoPaths.prefix(profilePhotos.count))
+            for image in profilePhotos.dropFirst(paths.count) {
+                paths.append(try await uploadPhoto(image))
+                profile.photoPaths = paths
             }
-            try await backend.saveProfile(ProfileUpload(
-                id: user,
-                firstName: profile.firstName.trimmingCharacters(in: .whitespaces),
-                birthday: Uploads.day(profile.birthday),
-                gender: ["Woman": "woman", "Man": "man"][profile.gender] ?? "nonbinary",
-                showMe: ["Women": "women", "Men": "men"][profile.showMe] ?? "everyone",
-                intent: ["Dating": "dating", "New friends": "friends"][profile.intent] ?? "both",
-                photoPaths: paths
-            ))
+            try await backend.saveProfile(profile.upload(id: user, photoPaths: paths))
             try await syncPlaces()
             finishOnboarding()
         } catch {
@@ -125,10 +118,7 @@ extension AppModel {
     }
 
     func deleteAccount() async {
-        if let backend, let user = backend.currentUserID {
-            let folder = user.uuidString.lowercased()
-            try? await backend.deleteAccount(photoPaths: (0..<6).map { "\(folder)/\($0).jpg" })
-        }
+        try? await backend?.deleteAccount()
         reset()
     }
 
@@ -178,16 +168,5 @@ extension AppModel {
 
     func photoURL(_ path: String) async -> URL? {
         try? await backend?.photoURL(path)
-    }
-}
-
-private extension UIImage {
-    /// Profile photos don't need to be bigger than 1600 px on the long side.
-    func resizedForUpload(maxSide: CGFloat = 1600) -> UIImage {
-        let longest = max(size.width, size.height)
-        guard longest > maxSide else { return self }
-        let scale = maxSide / longest
-        let target = CGSize(width: size.width * scale, height: size.height * scale)
-        return UIGraphicsImageRenderer(size: target).image { _ in draw(in: CGRect(origin: .zero, size: target)) }
     }
 }

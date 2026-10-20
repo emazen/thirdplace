@@ -217,7 +217,27 @@ struct YouView: View {
                     }
                     .padding(.top, 8)
 
-                    MonoLabel(text: "Account").padding(.top, 32)
+                    NavigationLink {
+                        EditProfileView()
+                    } label: {
+                        row {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Edit profile").font(TPFont.body(15)).foregroundStyle(Theme.ink)
+                                Text(profileHint)
+                                    .font(TPFont.body(13))
+                                    .foregroundStyle(model.profile.prompts.isEmpty ? Theme.accent : Theme.ink2)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.mute)
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .background(RoundedRectangle(cornerRadius: Theme.radius).fill(Theme.surface))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
+                    .padding(.top, 24)
+
+                    MonoLabel(text: "Account").padding(.top, 24)
                     VStack(spacing: 0) {
                         row {
                             VStack(alignment: .leading, spacing: 3) {
@@ -321,6 +341,12 @@ struct YouView: View {
         } message: {
             Text("This account has no email, so you won’t be able to sign back in.")
         }
+    }
+
+    private var profileHint: String {
+        let count = model.profile.prompts.count
+        if count == 0 { return "Add prompts so people have something to like." }
+        return "Photos, \(count) of \(LocalProfile.maxPrompts) prompts, the basics"
     }
 
     private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {

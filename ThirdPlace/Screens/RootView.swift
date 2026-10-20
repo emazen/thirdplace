@@ -43,6 +43,7 @@ struct RootView: View {
         case .account: AccountView()
         case .basics: BasicsView()
         case .photos: PhotosStepView()
+        case .prompts: PromptsStepView()
         case .verify: VerifyView()
         case .done: DoneView()
         case .feed: FeedView()

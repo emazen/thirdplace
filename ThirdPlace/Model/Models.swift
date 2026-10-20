@@ -2,7 +2,7 @@ import Foundation
 import ThirdPlaceCore
 
 enum Step: Int, CaseIterable, Codable {
-    case welcome, how, privacy, scan, places, moments, reveal, account, basics, photos, verify, done, feed
+    case welcome, how, privacy, scan, places, moments, reveal, account, basics, photos, prompts, verify, done, feed
 
     /// Position in the onboarding progress bar, or nil where the bar is hidden.
     var progress: Int? {
@@ -93,15 +93,6 @@ struct HiddenPlace: Identifiable, Codable, Hashable {
 
     var title: String { role == .home ? "Looks like home" : "Looks like work" }
     var detail: String { role == .home ? "Where most nights end · \(area)" : "Weekdays, 9 to 6 · \(area)" }
-}
-
-struct LocalProfile: Codable, Hashable {
-    var firstName = ""
-    var birthday = Calendar.current.date(byAdding: .year, value: -28, to: .now) ?? .now
-    var gender = "Woman"
-    var showMe = "Everyone"
-    var intent = "Dating"
-    var verified = false
 }
 
 struct SavedState: Codable {

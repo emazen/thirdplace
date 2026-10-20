@@ -27,6 +27,44 @@ public struct BackendConfig: Decodable, Sendable {
     }
 }
 
+// MARK: - Profile
+
+/// One prompt and its answer. A profile has up to three, each with a different question.
+public struct ProfilePrompt: Codable, Sendable, Hashable {
+    public var question: String
+    public var answer: String
+
+    public init(question: String, answer: String) {
+        self.question = question
+        self.answer = answer
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case question = "q"
+        case answer = "a"
+    }
+}
+
+/// Your own profile as the server has it, for editing on a new phone.
+public struct MyProfileRow: Decodable, Sendable {
+    public let firstName: String
+    /// yyyy-MM-dd
+    public let birthday: String
+    public let gender: String
+    public let showMe: String
+    public let intent: String
+    public let prompts: [ProfilePrompt]
+    public let photoPaths: [String]
+    public let verified: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case birthday, gender, intent, prompts, verified
+        case firstName = "first_name"
+        case showMe = "show_me"
+        case photoPaths = "photo_paths"
+    }
+}
+
 // MARK: - Uploads
 
 public struct ProfileUpload: Encodable, Sendable {
@@ -40,29 +78,25 @@ public struct ProfileUpload: Encodable, Sendable {
     public var showMe: String
     /// dating | friends | both
     public var intent: String
-    public var promptQuestion: String?
-    public var promptAnswer: String?
+    public var prompts: [ProfilePrompt]
     public var photoPaths: [String]
 
     public init(id: UUID, firstName: String, birthday: String, gender: String, showMe: String, intent: String,
-                promptQuestion: String? = nil, promptAnswer: String? = nil, photoPaths: [String] = []) {
+                prompts: [ProfilePrompt] = [], photoPaths: [String] = []) {
         self.id = id
         self.firstName = firstName
         self.birthday = birthday
         self.gender = gender
         self.showMe = showMe
         self.intent = intent
-        self.promptQuestion = promptQuestion
-        self.promptAnswer = promptAnswer
+        self.prompts = prompts
         self.photoPaths = photoPaths
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, birthday, gender, intent
+        case id, birthday, gender, intent, prompts
         case firstName = "first_name"
         case showMe = "show_me"
-        case promptQuestion = "prompt_question"
-        case promptAnswer = "prompt_answer"
         case photoPaths = "photo_paths"
     }
 }
@@ -144,8 +178,7 @@ public struct FeedRow: Decodable, Sendable, Identifiable, Hashable {
     public let age: Int
     public let verified: Bool
     public let photoPaths: [String]
-    public let promptQuestion: String?
-    public let promptAnswer: String?
+    public let prompts: [ProfilePrompt]
     public let neighbourhood: String?
     public let score: Double
     public let crossings: [Crossing]
@@ -153,12 +186,10 @@ public struct FeedRow: Decodable, Sendable, Identifiable, Hashable {
     public var id: UUID { personID }
 
     enum CodingKeys: String, CodingKey {
-        case age, verified, neighbourhood, score, crossings
+        case age, verified, neighbourhood, score, crossings, prompts
         case personID = "person_id"
         case firstName = "first_name"
         case photoPaths = "photo_paths"
-        case promptQuestion = "prompt_question"
-        case promptAnswer = "prompt_answer"
     }
 
     public struct Crossing: Decodable, Sendable, Hashable {

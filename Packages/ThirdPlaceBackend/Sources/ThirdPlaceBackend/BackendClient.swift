@@ -132,9 +132,12 @@ public final class BackendClient: Sendable {
         return !rows.isEmpty
     }
 
-    public func deleteAccount(photoPaths: [String]) async throws {
-        if !photoPaths.isEmpty {
-            _ = try? await client.storage.from(Self.photoBucket).remove(paths: photoPaths)
+    public func deleteAccount() async throws {
+        if let user = currentUserID {
+            let folder = user.uuidString.lowercased()
+            if let files = try? await client.storage.from(Self.photoBucket).list(path: folder), !files.isEmpty {
+                _ = try? await client.storage.from(Self.photoBucket).remove(paths: files.map { "\(folder)/\($0.name)" })
+            }
         }
         try await client.rpc("delete_my_account").execute()
         try? await client.auth.signOut()
@@ -146,13 +149,36 @@ public final class BackendClient: Sendable {
         try await client.from("profiles").upsert(profile).execute()
     }
 
-    /// Uploads one profile photo to <user>/<index>.jpg and returns its storage path.
-    public func uploadPhoto(_ jpeg: Data, index: Int) async throws -> String {
+    public func myProfile() async throws -> MyProfileRow? {
+        guard let user = currentUserID else { return nil }
+        let rows: [MyProfileRow] = try await retrying {
+            try await client.from("profiles")
+                .select("first_name, birthday, gender, show_me, intent, prompts, photo_paths, verified")
+                .eq("id", value: user).execute().value
+        }
+        return rows.first
+    }
+
+    /// Uploads one profile photo under a new name in <user>/ and returns its storage path.
+    /// New names mean nobody sees a stale cached copy after a photo is replaced.
+    public func uploadPhoto(_ jpeg: Data) async throws -> String {
         guard let user = currentUserID else { throw BackendError.notSignedIn }
-        let path = "\(user.uuidString.lowercased())/\(index).jpg"
-        try await client.storage.from(Self.photoBucket)
-            .upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: true))
+        let path = "\(user.uuidString.lowercased())/\(UUID().uuidString.lowercased()).jpg"
+        try await retrying {
+            _ = try await client.storage.from(Self.photoBucket)
+                .upload(path, data: jpeg, options: FileOptions(contentType: "image/jpeg", upsert: true))
+        }
         return path
+    }
+
+    public func downloadPhoto(_ path: String) async throws -> Data {
+        try await retrying { try await client.storage.from(Self.photoBucket).download(path: path) }
+    }
+
+    /// Best effort: a photo left behind only costs storage.
+    public func removePhotos(_ paths: [String]) async {
+        guard !paths.isEmpty else { return }
+        _ = try? await client.storage.from(Self.photoBucket).remove(paths: paths)
     }
 
     public func photoURL(_ path: String) async throws -> URL {
@@ -285,10 +311,12 @@ extension BackendClient {
 
 public enum BackendError: LocalizedError {
     case notSignedIn
+    case unreadablePhoto
 
     public var errorDescription: String? {
         switch self {
         case .notSignedIn: return "You’re not signed in."
+        case .unreadablePhoto: return "One of the photos couldn’t be read. Try a different one."
         }
     }
 }
