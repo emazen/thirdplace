@@ -36,6 +36,8 @@ struct MyPlace: Identifiable, Codable, Hashable {
     var cells: [String]?
     /// The street the photos cluster on, for "Around <street>" names.
     var street: String?
+    /// Where and at what hour the photos here were taken. Stays on the phone; drawn on the map.
+    var spots: [Spot]?
 
     var allCells: [String] { cells ?? [id] }
 

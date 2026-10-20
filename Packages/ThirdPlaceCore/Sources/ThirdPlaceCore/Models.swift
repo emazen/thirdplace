@@ -23,6 +23,19 @@ public struct Coordinate: Sendable, Hashable, Codable {
     }
 }
 
+/// A photo's position and local hour, kept on the phone to name places and draw them on a map.
+public struct Spot: Sendable, Hashable, Codable {
+    public let latitude: Double
+    public let longitude: Double
+    public let hour: Int
+
+    public init(latitude: Double, longitude: Double, hour: Int) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.hour = hour
+    }
+}
+
 public enum PlaceRole: String, Sendable, Codable {
     /// First place. Detected so it can be hidden, never used for matching.
     case home
@@ -49,6 +62,8 @@ public struct PlaceCluster: Identifiable, Sendable, Hashable, Codable {
     /// Index of each week (0 = the first week of the last 52) with a visit.
     public let visitWeeks: Set<Int>
     public let role: PlaceRole
+    /// Up to 80 of the photos here (position and hour). Never uploaded.
+    public let spots: [Spot]
 }
 
 /// A one-off occasion: a festival, a trip, a big night somewhere far from your usual places.
@@ -69,7 +84,7 @@ public struct PlaceAnalysis: Sendable {
     public let photosWithLocation: Int
     /// Third places, strongest first.
     public let places: [PlaceCluster]
-    /// Home and work, hidden from everyone.
+    /// Homes and workplaces (past and present), hidden from everyone.
     public let hidden: [PlaceCluster]
     public let moments: [Moment]
     /// Roughly how many cities the photos span (distinct ~40 km cells).

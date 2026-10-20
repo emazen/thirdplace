@@ -5,8 +5,9 @@ import Foundation
 /// 1. Bucket photos into ~150 m cells (geohash 7).
 /// 2. Grow clusters by hill-climbing: each cell joins its busiest neighbour, so dense
 ///    neighbourhoods split into separate peaks instead of chaining into one blob.
-/// 3. Name the roles: the cluster with the most nights is home, the one with the most
-///    weekday working hours is work. Both are hidden.
+/// 3. Name the roles: anywhere you sleep is a home and anywhere you spend weekday working
+///    hours is a workplace. People move and change jobs, so there can be several of each.
+///    All of them are hidden.
 /// 4. Everything else visited on enough separate days is a third place.
 /// 5. Leftover bursts of photos far from the usual places become moments.
 public struct PlaceAnalyzer {
@@ -16,6 +17,8 @@ public struct PlaceAnalyzer {
     public var minMomentPhotos = 8
     public var maxPlaces = 12
     public var maxMoments = 6
+    public var maxHomes = 3
+    public var maxWorkplaces = 3
 
     public init(calendar: Calendar = .current) {
         self.calendar = calendar
@@ -69,12 +72,17 @@ public struct PlaceAnalyzer {
             let days: Set<Date>
             let nights: Int
             let workDays: Int
+            /// Nights followed by a morning photo in the same place: the clearest sign of sleeping there.
+            let overnights: Int
+            /// Distinct weekdays with night photos. Homes see every day of the week; bars see Fri and Sat.
+            let nightWeekdays: Int
         }
         var candidates: [Candidate] = []
         for (peakCell, cells) in clusters {
             let pts = cells.flatMap { cellPoints[$0] ?? [] }
             let days = Set(pts.map { calendar.startOfDay(for: $0.date) })
             var nights = Set<Date>()
+            var mornings = Set<Date>()
             var work = Set<Date>()
             for p in pts {
                 let hour = calendar.component(.hour, from: p.date)
@@ -83,19 +91,43 @@ public struct PlaceAnalyzer {
                     let night = hour < 6 ? calendar.date(byAdding: .day, value: -1, to: p.date) ?? p.date : p.date
                     nights.insert(calendar.startOfDay(for: night))
                 }
+                if (5..<11).contains(hour) {
+                    mornings.insert(calendar.startOfDay(for: p.date))
+                }
                 if (2...6).contains(weekday) && (9..<18).contains(hour) {
                     work.insert(calendar.startOfDay(for: p.date))
                 }
             }
-            candidates.append(Candidate(peak: peakCell, cells: cells, points: pts, days: days, nights: nights.count, workDays: work.count))
+            let overnights = nights.filter { night in
+                calendar.date(byAdding: .day, value: 1, to: night).map { mornings.contains($0) } ?? false
+            }.count
+            let nightWeekdays = Set(nights.map { calendar.component(.weekday, from: $0) }).count
+            candidates.append(Candidate(peak: peakCell, cells: cells, points: pts, days: days, nights: nights.count,
+                                        workDays: work.count, overnights: overnights, nightWeekdays: nightWeekdays))
         }
 
-        let home = candidates
-            .filter { $0.nights >= 5 }
-            .max { ($0.nights, $0.points.count) < ($1.nights, $1.points.count) }
-        let work = candidates
-            .filter { $0.peak != home?.peak && $0.workDays >= 5 && Double($0.workDays) / Double(max($0.days.count, 1)) >= 0.6 }
-            .max { ($0.workDays, $0.points.count) < ($1.workDays, $1.points.count) }
+        // Homes: places you sleep. A bar you're at every Friday night isn't one, because it has no
+        // mornings after and only sees a couple of weekdays.
+        let maxNights = candidates.map(\.nights).max() ?? 0
+        let homes = candidates
+            .filter { c in
+                let sleepsHere = c.overnights >= 3 || (c.nights >= 8 && c.nightWeekdays >= 4)
+                let topAndPlausible = c.nights == maxNights && c.nights >= 5 && (c.nightWeekdays >= 3 || c.overnights >= 1)
+                return (sleepsHere && Double(c.nights) >= max(5, Double(maxNights) * 0.15)) || topAndPlausible
+            }
+            .sorted { ($0.nights, $0.points.count) > ($1.nights, $1.points.count) }
+            .prefix(maxHomes)
+        let homePeaks = Set(homes.map(\.peak))
+
+        // Workplaces: weekday working hours make up most of your time there. Old jobs count too.
+        let workLike = candidates.filter { c in
+            !homePeaks.contains(c.peak) && c.workDays >= 5 && Double(c.workDays) / Double(max(c.days.count, 1)) >= 0.6
+        }
+        let maxWork = workLike.map(\.workDays).max() ?? 0
+        let works = workLike
+            .filter { Double($0.workDays) >= max(5, Double(maxWork) * 0.2) }
+            .sorted { ($0.workDays, $0.points.count) > ($1.workDays, $1.points.count) }
+            .prefix(maxWorkplaces)
 
         func makeCluster(_ c: Candidate, role: PlaceRole) -> PlaceCluster {
             let lat = c.points.map(\.latitude).reduce(0, +) / Double(c.points.count)
@@ -112,13 +144,12 @@ public struct PlaceAnalyzer {
                 rhythm: rhythm(for: c.points),
                 monthlyVisits: monthly(days: c.days, reference: reference),
                 visitWeeks: weeks(days: c.days, reference: reference),
-                role: role
+                role: role,
+                spots: sample(c.points)
             )
         }
 
-        var hidden: [PlaceCluster] = []
-        if let home { hidden.append(makeCluster(home, role: .home)) }
-        if let work { hidden.append(makeCluster(work, role: .work)) }
+        let hidden = homes.map { makeCluster($0, role: .home) } + works.map { makeCluster($0, role: .work) }
         let hiddenPeaks = Set(hidden.map(\.id))
 
         // 4. Third places: returned to on several days, over more than a single trip.
@@ -147,6 +178,16 @@ public struct PlaceAnalyzer {
             moments: moments,
             areaCount: areas.count
         )
+    }
+
+    /// An even sample of photo positions, for naming and the map. Stays on the phone.
+    private func sample(_ points: [PhotoPoint], limit: Int = 80) -> [Spot] {
+        let sorted = points.sorted { $0.date < $1.date }
+        let step = max(1, sorted.count / limit)
+        return stride(from: 0, to: sorted.count, by: step).prefix(limit).map { i in
+            let p = sorted[i]
+            return Spot(latitude: p.latitude, longitude: p.longitude, hour: calendar.component(.hour, from: p.date))
+        }
     }
 
     // MARK: - Moments

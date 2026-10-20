@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import ThirdPlaceCore
 
 struct ScanView: View {
     @Environment(AppModel.self) private var model
@@ -314,47 +315,91 @@ private struct PlaceRow: View {
     }
 }
 
-/// "That's not where I go": pick the right venue nearby, call it just the area, or name it.
+/// "That's not where I go": see where the photos were taken, pick the right venue (ranked by
+/// photo evidence), search for it, call it just the area, name it, or hide it as a home or workplace.
 private struct PlaceFixSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let place: MyPlace
-    @State private var venues: [MKMapItem] = []
+    @State private var ranked: [PlaceNamer.RankedVenue] = []
     @State private var loading = true
+    @State private var query = ""
+    @State private var searchResults: [MKMapItem] = []
+    @State private var searching = false
     @State private var custom = ""
+    @State private var camera: MapCameraPosition = .automatic
+
+    private var spots: [Spot] { place.spots ?? [] }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Headline(text: "What’s this place?", size: 28)
-                    Subhead(text: "Pick where you actually go. Until you match with someone, they only see “\(place.category == "Area" ? "an area" : place.category.lowercased()) in \(place.area)”.", size: 15)
+                    Subhead(text: "Dots are where your photos were taken. Tap the venue you were actually at.", size: 15)
                         .padding(.top, 10)
+
+                    map
+                        .frame(height: 260)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
+                        .padding(.top, 18)
 
                     MonoLabel(text: "Where you go").padding(.top, 24)
                     VStack(spacing: 0) {
                         choice(title: "Just the area",
                                detail: "Around \(place.street ?? place.area) · not one venue",
-                               current: place.category == "Area", last: venues.isEmpty && !loading) {
+                               current: place.category == "Area", last: ranked.isEmpty && !loading) {
                             model.renamePlace(place.id, name: "Around \(place.street ?? place.area)", category: "Area")
                             dismiss()
                         }
                         if loading {
-                            ProgressView().frame(maxWidth: .infinity, minHeight: 80)
+                            ProgressView().frame(maxWidth: .infinity, minHeight: 72)
                         }
-                        ForEach(venues, id: \.self) { item in
-                            choice(title: item.name ?? "Place",
-                                   detail: "\(PlaceNamer.category(for: item.pointOfInterestCategory)) · \(PlaceNamer.distanceLabel(item, from: place.coordinate))",
-                                   current: item.name == place.name, last: item == venues.last) {
-                                model.renamePlace(place.id, name: item.name ?? "Place",
-                                                  category: PlaceNamer.category(for: item.pointOfInterestCategory))
-                                dismiss()
+                        ForEach(Array(ranked.prefix(10).enumerated()), id: \.element) { index, venue in
+                            choice(title: venue.item.name ?? "Place",
+                                   detail: detail(for: venue, index: index),
+                                   current: venue.item.name == place.name,
+                                   last: venue == ranked.prefix(10).last) {
+                                pick(venue.item)
                             }
                         }
                     }
                     .background(RoundedRectangle(cornerRadius: Theme.radius).fill(Theme.surface))
                     .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
                     .padding(.top, 10)
+
+                    MonoLabel(text: "Not in the list? Search for it").padding(.top, 24)
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(Theme.ink2)
+                        TextField("Bar, café, gym name…", text: $query)
+                            .font(TPFont.body(16))
+                            .submitLabel(.search)
+                            .autocorrectionDisabled()
+                            .onSubmit(search)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 52)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
+                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.rule))
+                    .padding(.top, 10)
+                    if searching {
+                        ProgressView().frame(maxWidth: .infinity).padding(.top, 12)
+                    }
+                    if !searchResults.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(searchResults, id: \.self) { item in
+                                choice(title: item.name ?? "Place",
+                                       detail: "\(PlaceNamer.category(for: item.pointOfInterestCategory)) · \(PlaceNamer.distanceLabel(item, from: place.coordinate)) away",
+                                       current: false, last: item == searchResults.last) {
+                                    pick(item)
+                                }
+                            }
+                        }
+                        .background(RoundedRectangle(cornerRadius: Theme.radius).fill(Theme.surface))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
+                        .padding(.top, 10)
+                    }
 
                     MonoLabel(text: "Or name it yourself").padding(.top, 24)
                     HStack(spacing: 10) {
@@ -373,10 +418,26 @@ private struct PlaceFixSheet: View {
                         .disabled(custom.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                     .padding(.top, 10)
+
+                    MonoLabel(text: "Somewhere private?").padding(.top, 28)
+                    VStack(spacing: 0) {
+                        choice(title: "This is a home", detail: "Yours, a partner’s, family’s. Hidden from everyone.", current: false) {
+                            model.hidePlace(place.id, as: .home)
+                            dismiss()
+                        }
+                        choice(title: "This is where I work or study", detail: "Hidden from everyone.", current: false, last: true) {
+                            model.hidePlace(place.id, as: .work)
+                            dismiss()
+                        }
+                    }
+                    .background(RoundedRectangle(cornerRadius: Theme.radius).fill(Theme.surface))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.rule))
+                    .padding(.top, 10)
                 }
                 .padding(.horizontal, Theme.gutter)
                 .padding(.bottom, 32)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Theme.paper.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -387,8 +448,74 @@ private struct PlaceFixSheet: View {
             }
         }
         .task {
-            venues = await PlaceNamer.nearbyVenues(place.coordinate)
+            camera = .region(region)
+            ranked = await PlaceNamer.rankedVenues(around: place.coordinate, spots: spots)
             loading = false
+        }
+    }
+
+    // MARK: Map
+
+    private var map: some View {
+        Map(position: $camera) {
+            ForEach(Array(spots.enumerated()), id: \.offset) { _, spot in
+                Annotation("", coordinate: CLLocationCoordinate2D(latitude: spot.latitude, longitude: spot.longitude), anchor: .center) {
+                    Circle()
+                        .fill(Theme.accent.opacity(0.55))
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 1))
+                }
+            }
+            ForEach(Array(ranked.prefix(10).enumerated()), id: \.element) { index, venue in
+                if let coordinate = venue.item.placemark.location?.coordinate {
+                    Annotation(venue.item.name ?? "", coordinate: coordinate, anchor: .bottom) {
+                        Button { pick(venue.item) } label: {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.system(size: index == 0 ? 28 : 22))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, venue.item.name == place.name ? Theme.accent : Theme.ink)
+                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Choose \(venue.item.name ?? "this place")")
+                    }
+                }
+            }
+        }
+        .mapStyle(.standard(pointsOfInterest: .excludingAll))
+    }
+
+    private var region: MKCoordinateRegion {
+        let lats = spots.map(\.latitude) + [place.latitude]
+        let lons = spots.map(\.longitude) + [place.longitude]
+        let center = CLLocationCoordinate2D(latitude: (lats.min()! + lats.max()!) / 2, longitude: (lons.min()! + lons.max()!) / 2)
+        let latSpan = max((lats.max()! - lats.min()!) * 1.6, 0.0025)
+        let lonSpan = max((lons.max()! - lons.min()!) * 1.6, 0.0025)
+        return MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: latSpan, longitudeDelta: lonSpan))
+    }
+
+    // MARK: Helpers
+
+    private func detail(for venue: PlaceNamer.RankedVenue, index: Int) -> String {
+        let base = "\(PlaceNamer.category(for: venue.item.pointOfInterestCategory)) · \(PlaceNamer.distanceLabel(venue.item, from: place.coordinate))"
+        if index == 0 && venue.support >= 0.18 && !spots.isEmpty {
+            return base + " · most likely"
+        }
+        return base
+    }
+
+    private func pick(_ item: MKMapItem) {
+        model.renamePlace(place.id, name: item.name ?? "Place", category: PlaceNamer.category(for: item.pointOfInterestCategory))
+        dismiss()
+    }
+
+    private func search() {
+        let text = query.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return }
+        searching = true
+        Task {
+            searchResults = Array(await PlaceNamer.searchNear(text, coordinate: place.coordinate).prefix(6))
+            searching = false
         }
     }
 
@@ -397,7 +524,7 @@ private struct PlaceFixSheet: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(TPFont.body(15, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
-                    Text(detail).font(TPFont.body(13)).foregroundStyle(Theme.ink2).lineLimit(1)
+                    Text(detail).font(TPFont.body(13)).foregroundStyle(Theme.ink2).lineLimit(2)
                 }
                 Spacer()
                 if current {
@@ -405,6 +532,7 @@ private struct PlaceFixSheet: View {
                 }
             }
             .padding(.horizontal, 16)
+            .padding(.vertical, 10)
             .frame(minHeight: 56)
             .contentShape(Rectangle())
         }

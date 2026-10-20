@@ -162,7 +162,7 @@ final class AppModel {
     }
 
     private func namePlaces(_ clusters: [PlaceCluster]) async -> [MyPlace] {
-        let named = await describeAll(clusters.map(\.center), findVenue: true)
+        let named = await describeAll(clusters.map(\.center), spots: clusters.map(\.spots), findVenue: true)
         return clusters.enumerated().map { index, cluster in
             let n = named[index]
             return MyPlace(
@@ -170,7 +170,7 @@ final class AppModel {
                 latitude: cluster.center.latitude, longitude: cluster.center.longitude,
                 photoCount: cluster.photoCount, visitDays: cluster.visitDays, rhythm: cluster.rhythm,
                 monthly: cluster.monthlyVisits, visitWeeks: cluster.visitWeeks.sorted(),
-                selected: index < 6, cells: cluster.cells, street: n.street
+                selected: index < 6, cells: cluster.cells, street: n.street, spots: cluster.spots
             )
         }
     }
@@ -193,7 +193,7 @@ final class AppModel {
         }
     }
 
-    private func describeAll(_ coordinates: [Coordinate], findVenue: Bool) async -> [PlaceNamer.Name] {
+    private func describeAll(_ coordinates: [Coordinate], spots: [[Spot]] = [], findVenue: Bool) async -> [PlaceNamer.Name] {
         var results = [PlaceNamer.Name?](repeating: nil, count: coordinates.count)
         await withTaskGroup(of: (Int, PlaceNamer.Name).self) { group in
             var nextIndex = 0
@@ -201,7 +201,8 @@ final class AppModel {
                 guard nextIndex < coordinates.count else { return }
                 let index = nextIndex
                 let coordinate = coordinates[index]
-                group.addTask { (index, await PlaceNamer.describe(coordinate, findVenue: findVenue)) }
+                let evidence = index < spots.count ? spots[index] : []
+                group.addTask { (index, await PlaceNamer.describe(coordinate, spots: evidence, findVenue: findVenue)) }
                 nextIndex += 1
             }
             for _ in 0..<3 { addNext() }
@@ -236,6 +237,14 @@ final class AppModel {
     }
 
     var selectedPlaceCount: Int { places.filter(\.selected).count }
+
+    /// "That's my home" / "That's where I work": move a place to the private list.
+    func hidePlace(_ id: String, as role: PlaceRole) {
+        guard let index = places.firstIndex(where: { $0.id == id }) else { return }
+        let place = places.remove(at: index)
+        hidden.append(HiddenPlace(id: place.id, role: role, area: place.area))
+        preview = nil
+    }
 
     /// The person's own correction of what a place is.
     func renamePlace(_ id: String, name: String, category: String) {
